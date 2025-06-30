@@ -1,26 +1,54 @@
 @import "tailwindcss";
 
+@font-face {
+  font-family: "Cift";
+  src: url("/fonts/Cift.ttf") format("truetype");
+}
+
+@font-face {
+  font-family: "Reaktif";
+  src: url("/fonts/Reaktif-Light.ttf") format("truetype");
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Reaktif";
+  src: url("/fonts/Reaktif-Normal.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Reaktif";
+  src: url("/fonts/Reaktif-SemiBold.ttf") format("truetype");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Reaktif";
+  src: url("/fonts/Reaktif-Medium.ttf") format("truetype");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --background: #000000;
+  --foreground: #ffffff;
 }
 
 body {
-  background: var(--background);
+  background-color: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+}
+
+h1,
+h2 {
+  font-family: "Cift", "Playfair Display", serif;
+}
+
+body {
+  font-family: "Reaktif", "Roboto", sans-serif;
 }
