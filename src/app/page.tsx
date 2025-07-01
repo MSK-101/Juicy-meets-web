@@ -4,7 +4,7 @@ import Link from "next/link";
 export default function Home() {
   return (
     <div className="min-h-screen bg-[url('/home/hero_bg.png')] bg-cover bg-center bg-no-repeat">
-      <header className="flex justify-between items-center bg-black/10 backdrop-blur-xs p-5 lg:px-14 lg:py-8">
+      <header className="flex justify-between items-center bg-black/10 backdrop-blur-xs shadow-2xl p-5 lg:px-14 lg:py-8">
         <Link href="/">
           <Image
             src="/logo.png"
@@ -14,7 +14,6 @@ export default function Home() {
             className="h-8 w-auto cursor-pointer hover:scale-105 duration-300"
           />
         </Link>
-
         <div className="flex items-center gap-4 md:gap-14">
           <div className="text-base md:text-lg hidden lg:block">
             <span className="font-semibold">3,435,789</span> Online Video
@@ -39,29 +38,29 @@ export default function Home() {
         <Image
           src="/home/hero_img_1.png"
           alt="Profile"
-          width={100}
-          height={180}
+          width={1000}
+          height={100}
           className="w-[150px] lg:w-[280px] xl:w[320px] shadow-lg"
         />
         <Image
           src="/home/hero_img_2.png"
           alt="Profile"
-          width={100}
-          height={180}
+          width={1000}
+          height={100}
           className="w-[150px] lg:w-[280px] xl:w[320px] shadow-lg"
         />
         <Image
           src="/home/hero_img_3.png"
           alt="Profile"
-          width={100}
-          height={180}
+          width={1000}
+          height={100}
           className="w-[150px] lg:w-[280px] xl:w[320px] shadow-lg"
         />
         <Image
           src="/home/hero_img_4.png"
           alt="Profile"
-          width={100}
-          height={180}
+          width={1000}
+          height={100}
           className="w-[150px] lg:w-[280px] xl:w[320px] shadow-lg"
         />
       </div>
