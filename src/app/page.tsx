@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import LoginSignupDialog from "../components/registration/LoginSignupDialog";
 
 export default function Home() {
   return (
@@ -23,9 +24,7 @@ export default function Home() {
           <button className="cursor-pointer hover:scale-105 duration-300">
             Language
           </button>
-          <button className="bg-white text-black py-2 px-4 rounded-full cursor-pointer hover:scale-105 duration-300">
-            Login/Sign Up
-          </button>
+          <LoginSignupDialog />
         </div>
       </header>
 
