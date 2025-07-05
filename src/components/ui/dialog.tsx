@@ -31,7 +31,7 @@ function DialogClose({
   return (
     <DialogPrimitive.Close
       data-slot="dialog-close"
-      className="absolute top-10 right-14 text-md w-[50px] border rounded-full aspect-square gradient-border flex items-center justify-center cursor-pointer"
+      className="absolute top-6 md:top-10 right-8 md:right-14 text-md w-[35px] md:w-[50px] border rounded-full aspect-square gradient-border flex items-center justify-center cursor-pointer"
     >
       <FontAwesomeIcon icon={faXmark} className="text-xl" />
     </DialogPrimitive.Close>
@@ -68,7 +68,7 @@ function DialogContent({
       <DialogPrimitive.Content
         data-slot="dialog-content"
         className={cn(
-          "gradient-border shadow-[0_3px_33.2px_4px_#A866FF61] bg-background data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-[50%] left-[50%] z-50 w-full translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border p-10 duration-200",
+          "overflow-y-auto gradient-border shadow-[0_3px_33.2px_4px_#A866FF61] bg-background data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-[50%] left-[50%] z-50 w-full translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border p-6 pb-14 md:p-10 duration-200 max-h-[90%]",
           className
         )}
         {...props}
