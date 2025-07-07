@@ -66,6 +66,7 @@ export default function Home() {
       </div>
 
       <div className="flex flex-col items-center text-center px-5 mt-4 lg:mt-6">
+        <Link href="/video-chat">
         <button
           className="py-4 px-8 rounded-full font-bold text-base md:text-xl my-6 cursor-pointer duration-300 shadow-[0_0_80px_#df42ff] hover:scale-105"
           style={{
@@ -74,6 +75,7 @@ export default function Home() {
         >
           START VIDEO CHAT
         </button>
+        </Link>
 
         <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-[3rem] my-4">
           Welcome to Juicy Meets Chats.
