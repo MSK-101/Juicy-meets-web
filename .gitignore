@@ -17,6 +17,9 @@
 /.next/
 /out/
 
+# Cursor configs
+/.cursor/
+
 # production
 /build
 

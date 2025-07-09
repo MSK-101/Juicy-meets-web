@@ -47,7 +47,7 @@ export default function LoginSignupDialog() {
           </button>
         </DialogTrigger>
         <DialogContent className="border md:border-[3px] gradient-border rounded-2xl md:rounded-3xl w-[90%] md:w-[60%]">
-          <DialogHeader className="opacity-0 md:opacity-1">
+          <DialogHeader>
             <DialogTitle className="flex justify-center items-center h-[35px] md:h-[50px]">
               <Image src="/logo.png" alt="Juicy Meets" width={40} height={41} />
             </DialogTitle>
@@ -104,7 +104,7 @@ export default function LoginSignupDialog() {
       {/* Login Modal */}
       <Dialog open={showSignupModal} onOpenChange={setShowSignupModal}>
         <DialogContent className="border md:border-[3px] gradient-border rounded-2xl md:rounded-3xl w-[90%] md:w-[60%]">
-          <DialogHeader className="opacity-0 md:opacity-1">
+          <DialogHeader>
             <DialogTitle className="flex justify-center items-center h-[35px] md:h-[50px]">
               <Image src="/logo.png" alt="Juicy Meets" width={40} height={41} />
             </DialogTitle>
@@ -158,7 +158,7 @@ export default function LoginSignupDialog() {
       {/* Plans Modal */}
       <Dialog open={showPlanModal} onOpenChange={setShowPlanModal}>
         <DialogContent className="border md:border-[3px] gradient-border rounded-2xl md:rounded-3xl w-[90%] lg:w-[80%] xl:w-[60%]">
-          <DialogHeader className="opacity-0 md:opacity-100">
+          <DialogHeader>
             <DialogTitle className="flex justify-center items-center h-[35px] md:h-[50px]">
               <Image src="/logo.png" alt="Juicy Meets" width={40} height={41} />
             </DialogTitle>
