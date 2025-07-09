@@ -57,8 +57,8 @@ export default function LoginSignupDialog() {
               Welcome to Juicy Meets Chats.
             </h1>
             <p className="mt-6 w-full max-w-[675px] font-light leading-[100%] md:leading-[160%] text-lg md:text-xl text-center">
-              Today is a new day. It's your day. You shape it. Sign in to start
-              chatting with strangers & make friends.
+              Today is a new day. It&apos;s your day. You shape it. Sign in to
+              start chatting with strangers & make friends.
             </p>
           </div>
 
@@ -94,7 +94,7 @@ export default function LoginSignupDialog() {
                 setShowSignupModal(true);
               }}
             >
-              Don't you have an account?
+              Don&apos;t you have an account?
               <span className="text-[#8B33FF] ml-2">Sign up</span>
             </Link>
           </div>

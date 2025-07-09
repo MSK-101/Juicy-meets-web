@@ -32,6 +32,7 @@ function DialogClose({
     <DialogPrimitive.Close
       data-slot="dialog-close"
       className="absolute top-6 md:top-10 right-8 md:right-14 text-md w-[35px] md:w-[50px] border rounded-full aspect-square gradient-border flex items-center justify-center cursor-pointer"
+      {...props}
     >
       <FontAwesomeIcon icon={faXmark} className="text-xl" />
     </DialogPrimitive.Close>
