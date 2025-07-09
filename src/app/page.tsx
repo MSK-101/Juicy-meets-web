@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import LoginSignupDialog from "../components/registration/LoginSignupDialog";
+import ImageSlider from "../components/ui/ImageSlider";
 
 export default function Home() {
   return (
@@ -33,42 +34,17 @@ export default function Home() {
         3,435,789 Online Video Chatters
       </div>
 
-      <div className="flex justify-center md:justify-around overflow-hidden gap-4 md:gap-5 px-5 my-5">
-        <Image
-          src="/home/hero_img_1.png"
-          alt="Profile"
-          width={1000}
-          height={100}
-          className="w-[150px] lg:w-[280px] xl:w[320px] shadow-lg"
-        />
-        <Image
-          src="/home/hero_img_2.png"
-          alt="Profile"
-          width={1000}
-          height={100}
-          className="w-[150px] lg:w-[280px] xl:w[320px] shadow-lg"
-        />
-        <Image
-          src="/home/hero_img_3.png"
-          alt="Profile"
-          width={1000}
-          height={100}
-          className="w-[150px] lg:w-[280px] xl:w[320px] shadow-lg"
-        />
-        <Image
-          src="/home/hero_img_4.png"
-          alt="Profile"
-          width={1000}
-          height={100}
-          className="w-[150px] lg:w-[280px] xl:w[320px] shadow-lg"
-        />
-      </div>
+      <ImageSlider imageCount={4} basePath="/home/hero_img_" />
 
       <div className="flex flex-col items-center text-center px-5 mt-4 lg:mt-6">
         <button
-          className="py-4 px-8 rounded-full font-bold text-base md:text-xl my-6 cursor-pointer duration-300 shadow-[0_0_80px_#df42ff] hover:scale-105"
+          className="py-6 px-12 rounded-full font-bold text-base md:text-xl my-6 cursor-pointer duration-300 hover:scale-105"
           style={{
-            background: "linear-gradient(90deg, #cb00ff 0%, #df42ff 100%)",
+            background:
+              "linear-gradient(90deg, #a91dfd 0%, #b231f5 25%, #a91dfd 50%, #c66cf3 85%, #de48ff 100%)",
+            border: "1px solid #e02fff",
+            boxShadow:
+              "inset 0px 0px 0px 0px rgba(0, 255, 0, 0.3), inset 0px 0px 20px 2px #e426ff, 0 0 200px #df42ff",
           }}
         >
           START VIDEO CHAT
