@@ -53,20 +53,39 @@ body {
   font-family: "Reaktif", "Roboto", sans-serif;
 }
 
-.gradient-border, .hover\:gradient-border:hover, .focus-visible\:gradient-border:focus-visible {
-  background: linear-gradient(var(--background-color, black), var(--background-color, black)) padding-box,
-  radial-gradient(579.34% 1764.15% at 232.75% -112.53%, #9747FF 0%, #E2CCFF 17.94%, #C599FF 27.89%, #8B33FF 36.68%, #E2CCFF 46.4%, #8B33FF 56.65%, #E2CCFF 66.39%, #9747FF 77.18%, #9747FF 88.62%, #420099 100%) border-box;
+.gradient-border,
+.hover\:gradient-border:hover,
+.focus-visible\:gradient-border:focus-visible {
+  background: linear-gradient(
+        var(--background-color, black),
+        var(--background-color, black)
+      )
+      padding-box,
+    radial-gradient(
+        579.34% 1764.15% at 232.75% -112.53%,
+        #9747ff 0%,
+        #e2ccff 17.94%,
+        #c599ff 27.89%,
+        #8b33ff 36.68%,
+        #e2ccff 46.4%,
+        #8b33ff 56.65%,
+        #e2ccff 66.39%,
+        #9747ff 77.18%,
+        #9747ff 88.62%,
+        #420099 100%
+      )
+      border-box;
   border-color: transparent !important;
 
-  transition: border-color .2s ease-in-out;
+  transition: border-color 0.2s ease-in-out;
 }
 
-.plan-swiper .swiper-pagination-bullet{
-  background-color: #D9D9D9;
+.plan-swiper .swiper-pagination-bullet {
+  background-color: #d9d9d9;
   opacity: 1;
 }
 
-.plan-swiper .swiper-pagination-bullet-active{
-  background-color: #9747FF;
+.plan-swiper .swiper-pagination-bullet-active {
+  background-color: #9747ff;
   scale: 2;
 }
