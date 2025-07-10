@@ -37,6 +37,21 @@ Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/bui
 
 # Juicy Meets Web
 
+## TURN/STUN Environment Variables (for WebRTC)
+
+Add these to your `.env.local` for local testing, and to your deployment environment for production:
+
+```
+NEXT_PUBLIC_CABLE_URL=ws://localhost:3000/cable
+NEXT_PUBLIC_STUN_URL=stun:stun.l.google.com:19302
+NEXT_PUBLIC_TURN_URL=turn:global.relay.metered.ca:80
+NEXT_PUBLIC_TURN_USERNAME=efb0b7b7b6b0b7b7b7b7b7b7
+NEXT_PUBLIC_TURN_CREDENTIAL=efb0b7b7b7b7b7b7b7b7b7b7b7b7b7b7
+```
+
+- **Do not commit real TURN credentials to public repos.**
+- For production, use your own TURN provider (Xirsys, Twilio, etc) or self-hosted coturn.
+
 ## Deployment & Testing Guide
 
 ### 1. Backend (Rails/ActionCable)
