@@ -1,9 +1,35 @@
+"use client";
+
+import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import LoginSignupDialog from "../components/registration/LoginSignupDialog";
+import LoginDialog from "@/components/dialogs/login-dialog";
+import UserDetailsDialog from "@/components/dialogs/user-details-dialog";
+import { useRouter } from "next/navigation";
+import PlansDialog from "@/components/dialogs/plans-dialog";
 import ImageSlider from "../components/ui/ImageSlider";
 
 export default function Home() {
+  const [showLoginDialog, setShowLoginDialog] = useState(false);
+  const [showUserDetailsDialog, setUserDetailsDialog] = useState(false);
+  const [showPlansDialog, setShowPlansDialog] = useState(false);
+  const router = useRouter();
+
+  const startVideoChatHandler = () => {
+    if (typeof window !== "undefined") {
+      const userDetails = localStorage.getItem("juicyMeetsUserDetails");
+      if (userDetails) {
+        // Generate a random chat id (e.g., 16 chars alphanumeric)
+        const randomId =
+          Math.random().toString(36).substring(2, 10) +
+          Math.random().toString(36).substring(2, 10);
+        router.push(`/chat/${randomId}`);
+      } else {
+        setUserDetailsDialog(true);
+      }
+    }
+  };
+
   return (
     <div className="min-h-screen bg-[url('/home/hero_bg.png')] bg-cover bg-center bg-no-repeat">
       <header className="flex justify-between items-center bg-black/10 backdrop-blur-xs shadow-2xl p-5 lg:px-14 lg:py-8">
@@ -22,10 +48,18 @@ export default function Home() {
             Chatters
           </div>
 
-          <button className="cursor-pointer hover:scale-105 duration-300">
-            Language
+          <button
+            className="bg-linear-180 from-[#420099] to-[#9747FF] cursor-pointer px-5 py-2 rounded-full"
+            onClick={() => {
+              setShowLoginDialog(true);
+            }}
+          >
+            Log In
           </button>
-          <LoginSignupDialog />
+          <LoginDialog
+            showDialog={showLoginDialog}
+            setShowDialog={setShowLoginDialog}
+          />
         </div>
       </header>
 
@@ -46,9 +80,21 @@ export default function Home() {
             boxShadow:
               "inset 0px 0px 0px 0px rgba(0, 255, 0, 0.3), inset 0px 0px 20px 2px #e426ff, 0 0 200px #df42ff",
           }}
+          onClick={startVideoChatHandler}
         >
           START VIDEO CHAT
         </button>
+
+        <UserDetailsDialog
+          showDialog={showUserDetailsDialog}
+          setShowDialog={setUserDetailsDialog}
+          setShowPlansDialog={setShowPlansDialog}
+        />
+
+        <PlansDialog
+          showDialog={showPlansDialog}
+          setShowDialog={setShowPlansDialog}
+        />
 
         <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-[3rem] my-4">
           Welcome to Juicy Meets Chats.
