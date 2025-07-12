@@ -102,7 +102,7 @@ export default function Home() {
 
       <div className="h-full absolute  top-0 left-0 right-0 overflow-hidden">
         <div className="hidden md:block pt-40">
-          <ImageSlider imageCount={4} basePath="/home/hero_img_" />
+          <ImageSlider />
         </div>
 
         <div className="block md:hidden">
