@@ -1,9 +1,7 @@
 "use client";
 import Image from "next/image";
 
-type ImageSliderProps = {};
-
-export default function MobileImageSlider({}: ImageSliderProps) {
+export default function MobileImageSlider() {
   const bg_images = [
     "c11.jpg",
     "c12.jpg",
