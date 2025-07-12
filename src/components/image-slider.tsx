@@ -10,36 +10,41 @@ export default function ImageSlider() {
     "c15.jpg",
     "c16.jpg",
     "c17.jpg",
-
-    "c21.jpg",
-    "c22.jpg",
-    "c23.jpg",
-    "c24.jpg",
-    "c25.jpg",
     "c26.jpg",
-    "c27.jpg",
-
-    "c31.jpg",
-    "c32.jpg",
-    "c33.jpg",
-    "c34.jpg",
-    "c35.jpg",
-    "c36.jpg",
-    "c37.jpg",
+    "c22.jpg",
+    "c24.jpg",
+    "c11.jpg",
+    "c12.jpg",
+    "c13.jpg",
+    "c14.jpg",
+    "c15.jpg",
+    "c16.jpg",
+    "c17.jpg",
+    "c26.jpg",
+    "c22.jpg",
+    "c24.jpg",
   ];
 
   return (
-    <div className="overflow-hidden my-5 px-5 w-full">
+    <div className="overflow-hidden w-full">
+      {/*
+        the width calculation is as follows:
+        total images: 20
+        one image width: 300
+        gap between images: 25
+        total width: [(20*300) / 2 ] + [(30*20)/2] => 3300
+      */}
       <div
-        className="flex gap-6 md:gap-8 lg:gap-32"
+        className="flex w-[3300px] gap-[30px]"
         style={{
           animation: "slideX 40s linear infinite",
         }}
       >
         {images.map((image, index) => (
+          // width: 300px
           <div
             key={index}
-            className="w-[334px] aspect-[334/594] lg:w-[300px] shrink-0 cursor-pointer hover:grayscale-100 transition-all duration-300"
+            className="w-[300px] aspect-[334/594] flex-none cursor-pointer hover:grayscale-100 transition-[filter] duration-700"
           >
             <Image
               src={`/home/${image}`}
@@ -58,29 +63,7 @@ export default function ImageSlider() {
             transform: translateX(0);
           }
           100% {
-            transform: translateX(calc(-1 * (150px + 1.5rem) * ${21}));
-          }
-        }
-
-        @media (min-width: 768px) {
-          @keyframes slideX {
-            0% {
-              transform: translateX(0);
-            }
-            100% {
-              transform: translateX(calc(-1 * (200px + 2rem) * ${21}));
-            }
-          }
-        }
-
-        @media (min-width: 1024px) {
-          @keyframes slideX {
-            0% {
-              transform: translateX(0);
-            }
-            100% {
-              transform: translateX(calc(-1 * (280px + 2.5rem) * ${21}));
-            }
+            transform: translateX(-100%);
           }
         }
       `}</style>
