@@ -7,8 +7,8 @@ import LoginDialog from "@/components/dialogs/login-dialog";
 import UserDetailsDialog from "@/components/dialogs/user-details-dialog";
 import { useRouter } from "next/navigation";
 import PlansDialog from "@/components/dialogs/plans-dialog";
-import ImageSlider from "../components/ui/image-slider";
-import MobileImageSlider from "@/components/ui/mobile-image-slider";
+import ImageSlider from "../components/image-slider";
+import MobileImageSlider from "@/components/mobile-image-slider";
 
 export default function Home() {
   const [showLoginDialog, setShowLoginDialog] = useState(false);
@@ -105,8 +105,8 @@ export default function Home() {
           <ImageSlider imageCount={4} basePath="/home/hero_img_" />
         </div>
 
-        <div className="block md:hidden scale-120">
-          <MobileImageSlider imageCount={4} basePath="/home/hero_img_" />
+        <div className="block md:hidden">
+          <MobileImageSlider />
         </div>
       </div>
     </div>
