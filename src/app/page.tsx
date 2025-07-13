@@ -72,7 +72,7 @@ export default function Home() {
               "linear-gradient(90deg, #a91dfd 0%, #b231f5 25%, #a91dfd 50%, #c66cf3 85%, #de48ff 100%)",
             border: "1px solid #e02fff",
             boxShadow:
-              "inset 0px 0px 0px 0px rgba(0, 255, 0, 0.3), inset 0px 0px 20px 2px #e426ff, 0 0 200px #df42ff",
+              "inset 0px 0px 0px 0px rgba(0, 255, 0, 0.3), inset 0px 0px 20px 2px, 0 0 200px #df42ff",
           }}
           onClick={startVideoChatHandler}
         >
