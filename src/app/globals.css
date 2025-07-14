@@ -80,6 +80,115 @@ body {
   transition: border-color 0.2s ease-in-out;
 }
 
+.input-gradient-border {
+  border-color: #dcd9e0 !important;
+}
+
+.conic-gradient-btn {
+  position: relative;
+  overflow: hidden;
+  z-index: 0;
+}
+
+.diamond-animated-btn {
+  position: relative;
+  overflow: hidden;
+  z-index: 0;
+  border-radius: 1.5rem;
+  background: linear-gradient(
+    120deg,
+    #d514a2,
+    #e426ff,
+    #c599ff,
+    #d842ce,
+    #e2ccff,
+    #af0a93,
+    #e426ff
+  );
+  background-size: 400% 400%;
+  animation: holographicShift 6s ease-in-out infinite;
+  color: white;
+}
+@keyframes holographicShift {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+/* Remove mobile bg on larger screens */
+@media (min-width: 768px) {
+  .diamond-animated-btn-none {
+    background: none !important;
+    animation: none !important;
+  }
+}
+
+@keyframes gradientShift {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+.bg-animated-button {
+  background: linear-gradient(
+    110deg,
+    #af15fc 0%,
+    #cd2df7 15%,
+    #d27cfb 25%,
+    #ad24ff 35%,
+    #ad24ff 45%,
+    #d27cfb 55%,
+    #af15fc 65%,
+    #cd2df7 75%,
+    #d27cfb 85%,
+    #ad24ff 100%
+  );
+  background-size: 200% 200%;
+  animation: gradientShift 6s ease infinite;
+}
+/* Conic gradient for md and up */
+.conic-gradient-btn {
+  position: relative;
+  overflow: hidden;
+  z-index: 0;
+  border-radius: 1.5rem;
+  background-color: #120020;
+}
+
+.conic-gradient-btn::before {
+  content: "";
+  position: absolute;
+  inset: -90%;
+  z-index: -1;
+  background: conic-gradient(
+    from 0deg at 50% 50%,
+    #268aff 0deg,
+    #f36fff 53.3deg,
+    #268aff 90.46deg,
+    #52eaea 126.24deg,
+    #f36fff 178.82deg,
+    #52eaea 360deg
+  );
+  animation: spin 4s linear infinite;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .plan-swiper .swiper-pagination-bullet {
   background-color: #d9d9d9;
   opacity: 1;
