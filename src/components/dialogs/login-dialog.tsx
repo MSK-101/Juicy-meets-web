@@ -3,12 +3,7 @@
 import Image from "next/image";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../ui/dialog";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faApple, faGoogle } from "@fortawesome/free-brands-svg-icons";
-import {
-  faArrowRightToBracket,
-  faEnvelope,
-  faPhone,
-} from "@fortawesome/free-solid-svg-icons";
+import { faArrowRightToBracket } from "@fortawesome/free-solid-svg-icons";
 import Link from "next/link";
 import { Input } from "../ui/input";
 
