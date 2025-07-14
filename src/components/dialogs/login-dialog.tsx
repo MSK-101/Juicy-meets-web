@@ -4,8 +4,13 @@ import Image from "next/image";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../ui/dialog";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faApple, faGoogle } from "@fortawesome/free-brands-svg-icons";
-import { faEnvelope, faPhone } from "@fortawesome/free-solid-svg-icons";
+import {
+  faArrowRightToBracket,
+  faEnvelope,
+  faPhone,
+} from "@fortawesome/free-solid-svg-icons";
 import Link from "next/link";
+import { Input } from "../ui/input";
 
 // Add prop types for the dialog
 interface dialogProps {
@@ -36,26 +41,28 @@ export default function LoginDialog({
         </div>
 
         <div className="flex flex-col items-center gap-4 mt-14">
-          <button className="border-[#515151] hover:gradient-border border rounded-xl py-3 w-full max-w-[398px] flex items-center justify-center gap-4 cursor-pointer">
-            <FontAwesomeIcon icon={faApple} className="text-[24px]" /> Sign in
-            with Apple
-          </button>
-          <button className="border-[#515151] hover:gradient-border border rounded-xl py-3 w-full max-w-[398px] flex items-center justify-center gap-4 cursor-pointer">
-            <FontAwesomeIcon icon={faGoogle} className="text-[20px]" />
-            Sign in with Google
-          </button>
-          <button className="border-[#515151] hover:gradient-border border rounded-xl py-3 w-full max-w-[398px] flex items-center justify-center gap-4 cursor-pointer">
-            <FontAwesomeIcon icon={faEnvelope} className="text-[20px]" />
-            Sign in with Email
-          </button>
-          <button className="border-[#515151] hover:gradient-border border rounded-xl py-3 w-full max-w-[398px] flex items-center justify-center gap-4 cursor-pointer">
-            <FontAwesomeIcon icon={faPhone} className="text-[20px]" />
-            Sign in with Phone number
+          <Input
+            type="email"
+            placeholder="Email"
+            className="w-full max-w-[398px]"
+            id="email"
+          />
+          <Input
+            type="password"
+            placeholder="Password"
+            className="w-full max-w-[398px]"
+            id="password"
+          />
+          <button className="bg-linear-180 from-[#420099] to-[#9747FF] rounded-xl py-3 w-full max-w-[398px] cursor-pointer flex gap-3 justify-center">
+            <FontAwesomeIcon
+              icon={faArrowRightToBracket}
+              className="text-[20px]"
+            />
+            Sign in
           </button>
 
           <Link href="#" className="mt-5">
-            Don&apos;t you have an account?
-            <span className="text-[#8B33FF] ml-2">Sign up</span>
+            Forgot your Password?
           </Link>
         </div>
       </DialogContent>
