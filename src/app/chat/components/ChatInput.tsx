@@ -3,6 +3,7 @@ import React, { RefObject, useState, useEffect, useRef } from "react";
 interface ChatMessage {
   sender: string;
   text: string;
+  timestamp?: number;
 }
 
 interface ChatInputProps {
@@ -22,26 +23,36 @@ export default function ChatInput({ messages, input, setInput, handleSend, chatE
   const [showMessages, setShowMessages] = useState(true);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Start or reset the 2-minute timer
-  const startHideTimer = () => {
+  // Helper: get last message timestamp
+  const lastMessageTime = messages.length > 0 ? messages[messages.length - 1].timestamp || 0 : 0;
+
+  // Hide timer logic: only start if input is empty and last message is older than 15s
+  useEffect(() => {
+    if (input.trim() !== "") {
+      setShowMessages(true);
+      if (timerRef.current) clearTimeout(timerRef.current);
+      return;
+    }
+    const now = Date.now();
+    if (now - lastMessageTime < 15000) {
+      setShowMessages(true);
+      if (timerRef.current) clearTimeout(timerRef.current);
+      return;
+    }
+    // Start or reset the 15s timer
     if (timerRef.current) clearTimeout(timerRef.current);
     timerRef.current = setTimeout(() => {
       setShowMessages(false);
-    }, 1 * 15 * 1000); // 15 seconds
-  };
-
-  // On mount, start timer
-  useEffect(() => {
-    startHideTimer();
+    }, 15000);
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
     };
-  }, []);
+  }, [input, lastMessageTime]);
 
   // On input focus, show messages and reset timer
   const handleFocus = () => {
     setShowMessages(true);
-    startHideTimer();
+    if (timerRef.current) clearTimeout(timerRef.current);
   };
 
   // Determine form class based on messages and showMessages
@@ -80,13 +91,13 @@ export default function ChatInput({ messages, input, setInput, handleSend, chatE
             ➤
           </button>
         </div>
-        {/* Messages container with fade/slide animation */}
+        {/* Messages container with fade/slide animation and scroll */}
         {messages.length > 0 && (
+          console.log(messages),
           <div
-            className={`flex flex-col gap-1 overflow-y-auto transition-all duration-500 ease-in-out ${
-              showMessages ? 'opacity-100 max-h-40 translate-y-0' : 'opacity-0 max-h-0 -translate-y-4 pointer-events-none'
+            className={`flex flex-col gap-1 transition-all duration-500 ease-in-out ${
+              showMessages ? 'opacity-100 max-h-[180px] overflow-y-scroll translate-y-0' : 'opacity-0 max-h-0 overflow-hidden -translate-y-4 pointer-events-none'
             }`}
-            style={{ maxHeight: showMessages ? '160px' : '0px' }}
           >
             {messages.map((msg, idx) => (
               <div

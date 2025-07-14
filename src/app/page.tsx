@@ -66,10 +66,8 @@ export default function Home() {
 
       <main className="mt-auto mb-10 flex flex-col items-center justify-center z-20">
         <button
-          className="py-6 px-12 rounded-full font-bold text-base md:text-xl my-6 cursor-pointer duration-300 hover:scale-105 order-3 md:order-1"
+          className="py-6 px-12 rounded-full bg-animated-button font-bold text-base md:text-xl my-6 cursor-pointer duration-300 hover:scale-105 order-3 md:order-1 text-white"
           style={{
-            background:
-              "linear-gradient(90deg, #a91dfd 0%, #b231f5 25%, #a91dfd 50%, #c66cf3 85%, #de48ff 100%)",
             border: "1px solid #e02fff",
             boxShadow:
               "inset 0px 0px 0px 0px rgba(0, 255, 0, 0.3), inset 0px 0px 20px 2px, 0 0 200px #df42ff",
@@ -78,6 +76,7 @@ export default function Home() {
         >
           START VIDEO CHAT
         </button>
+
 
         <UserDetailsDialog
           showDialog={showUserDetailsDialog}

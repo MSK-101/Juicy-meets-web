@@ -129,6 +129,31 @@ body {
   }
 }
 
+@keyframes gradientShift {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+.bg-animated-button {
+  background: linear-gradient(
+    90deg,
+    #a91dfd 0%,
+    #b231f5 25%,
+    #d315ba 50%,
+    #a91dfd 65%,
+    #f8a5dd 85%,
+    #de48ff 100%
+  );
+  background-size: 200% 200%;
+  animation: gradientShift 6s ease infinite;
+}
 /* Conic gradient for md and up */
 .conic-gradient-btn {
   position: relative;

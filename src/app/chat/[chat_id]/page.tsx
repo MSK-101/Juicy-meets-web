@@ -3,6 +3,7 @@ import React, { useState, useRef, useEffect } from "react";
 import MockVideo from "../components/MockVideo";
 import DiamondCountBar from "../components/DiamondCountBar";
 import ChatInput from "../components/ChatInput";
+import FlagButton from "../components/FlagButton";
 
 // Define the message type
 interface ChatMessage {
@@ -50,8 +51,7 @@ export default function VideoChatPage() {
     if (e) e.preventDefault();
     if (!input.trim()) return;
     setMessages((prev) => {
-      const next = [...prev, { sender: "you", text: input.trim() }];
-      return next.length > 4 ? next.slice(next.length - 4) : next;
+      return [...prev, { sender: "you", text: input.trim() }];
     });
     setInput("");
   }
@@ -96,7 +96,7 @@ export default function VideoChatPage() {
             )}
             {/* Flag icon (top right, only right panel) */}
             <div className="absolute top-4 right-4 z-10">
-              <img src="/flag.png" alt="flag" className="w-8 h-8 mr-3" />
+              <FlagButton />
             </div>
             {/* Chat overlay/input */}
             <ChatInput
