@@ -99,9 +99,9 @@ body {
     120deg,
     #d514a2,
     #e426ff,
-    #C599FF,
+    #c599ff,
     #d842ce,
-    #E2CCFF,
+    #e2ccff,
     #af0a93,
     #e426ff
   );
@@ -143,13 +143,17 @@ body {
 
 .bg-animated-button {
   background: linear-gradient(
-    90deg,
-    #a91dfd 0%,
-    #b231f5 25%,
-    #d315ba 50%,
-    #a91dfd 65%,
-    #f8a5dd 85%,
-    #de48ff 100%
+    110deg,
+    #af15fc 0%,
+    #cd2df7 15%,
+    #d27cfb 25%,
+    #ad24ff 35%,
+    #ad24ff 45%,
+    #d27cfb 55%,
+    #af15fc 65%,
+    #cd2df7 75%,
+    #d27cfb 85%,
+    #ad24ff 100%
   );
   background-size: 200% 200%;
   animation: gradientShift 6s ease infinite;
@@ -164,18 +168,18 @@ body {
 }
 
 .conic-gradient-btn::before {
-  content: '';
+  content: "";
   position: absolute;
   inset: -90%;
   z-index: -1;
   background: conic-gradient(
     from 0deg at 50% 50%,
-    #268AFF 0deg,
-    #F36FFF 53.3deg,
-    #268AFF 90.46deg,
-    #52EAEA 126.24deg,
-    #F36FFF 178.82deg,
-    #52EAEA 360deg
+    #268aff 0deg,
+    #f36fff 53.3deg,
+    #268aff 90.46deg,
+    #52eaea 126.24deg,
+    #f36fff 178.82deg,
+    #52eaea 360deg
   );
   animation: spin 4s linear infinite;
 }

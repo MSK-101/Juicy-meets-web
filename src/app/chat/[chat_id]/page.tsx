@@ -28,7 +28,8 @@ export default function VideoChatPage() {
 
   // Request camera access on mount
   useEffect(() => {
-    navigator.mediaDevices?.getUserMedia({ video: true })
+    navigator.mediaDevices
+      ?.getUserMedia({ video: true })
       .then((stream) => {
         setVideoStream(stream);
         if (videoRef.current) {
@@ -67,9 +68,8 @@ export default function VideoChatPage() {
             <div className="absolute top-4 left-4 z-10">
               <img src="/logo.png" alt="Logo" className="w-8 h-8" />
             </div>
-            {/* Top right diamond count (desktop) */}
-            <div className="absolute top-3 right-4 flex items-center">
-              <DiamondCountBar count={3900} />
+            <div className="absolute top-4 right-4 z-10">
+              <FlagButton />
             </div>
           </div>
           {/* Divider with gradient border */}
@@ -89,14 +89,13 @@ export default function VideoChatPage() {
                 playsInline
                 muted
                 className="w-full h-full object-cover bg-black/80"
-                style={{ objectFit: 'cover' }}
+                style={{ objectFit: "cover" }}
               />
             ) : (
               <MockVideo flip imgSrc="/no_user.png" />
             )}
-            {/* Flag icon (top right, only right panel) */}
-            <div className="absolute top-4 right-4 z-10">
-              <FlagButton />
+            <div className="absolute top-3 right-4 flex items-center">
+              <DiamondCountBar count={3900} />
             </div>
             {/* Chat overlay/input */}
             <ChatInput
