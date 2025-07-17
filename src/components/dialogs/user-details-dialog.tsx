@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../ui/dialog";
 import { Input } from "../ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
@@ -93,30 +94,46 @@ export default function UserDetailsDialog({
               Please enter a valid email address.
             </div>
           )}
+
           <Input
             type="text"
             placeholder="Age"
             className="w-full max-w-[398px]"
             id="age"
             value={age}
-            onChange={(e) => setAge(e.target.value)}
-          />
-          <Input
-            type="text"
-            placeholder="Gender"
-            className="w-full max-w-[398px]"
-            id="gender"
-            value={gender}
-            onChange={(e) => setGender(e.target.value)}
-          />
-          <Input
-            type="text"
-            placeholder="Interested in"
-            className="w-full max-w-[398px]"
-            id="interest"
-            value={interest}
-            onChange={(e) => setInterest(e.target.value)}
-          />
+            onChange={(e) => setAge(e.target.value)}          />
+          <Select value={gender} onValueChange={setGender}>
+            <SelectTrigger
+              className="w-full max-w-[398px]"
+              style={{
+                backgroundColor: gender ? '#e8f1ff' : 'transparent',
+                color: gender ? '#000000' : '#6b7280'
+              }}
+            >
+              <SelectValue placeholder="Gender" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="male">Male</SelectItem>
+              <SelectItem value="female">Female</SelectItem>
+              <SelectItem value="other">Other</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={interest} onValueChange={setInterest}>
+            <SelectTrigger
+              className="w-full max-w-[398px]"
+              style={{
+                backgroundColor: interest ? '#e8f1ff' : 'transparent',
+                color: interest ? '#000000' : '#6b7280'
+              }}
+            >
+              <SelectValue placeholder="Interested in" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="male">Male</SelectItem>
+              <SelectItem value="female">Female</SelectItem>
+              <SelectItem value="other">Other</SelectItem>
+            </SelectContent>
+          </Select>
 
           <button
             className="gradient-border border rounded-xl py-3 w-full max-w-[398px] cursor-pointer mt-6"
