@@ -4,6 +4,8 @@ import MockVideo from "../components/MockVideo";
 import DiamondCountBar from "../components/DiamondCountBar";
 import ChatInput from "../components/ChatInput";
 import FlagButton from "../components/FlagButton";
+import MaleIcon from "../components/MaleIcon";
+import FemaleIcon from "../components/FemaleIcon";
 
 // Define the message type
 interface ChatMessage {
@@ -61,15 +63,19 @@ export default function VideoChatPage() {
     <div className="fixed inset-0 z-0 flex items-center justify-center bg-black/80">
       <div className="w-full h-full flex flex-col md:flex-row items-stretch justify-stretch p-0">
         <div className="gradient-border border md:border-[3px] w-full h-full flex flex-col md:flex-row overflow-hidden relative">
-          {/* Left/User 1 */}
+                    {/* Left/User 1 */}
           <div className="flex-1 flex flex-col relative overflow-hidden">
             <MockVideo imgSrc="/home/c34.jpg" />
             {/* Project logo (top left, only left panel) */}
             <div className="absolute top-4 left-4 z-10">
               <img src="/logo.png" alt="Logo" className="w-8 h-8" />
             </div>
-            <div className="absolute top-4 right-4 z-10">
+
+            {/* Desktop: Left screen controls - Flag, Male, Female icons */}
+            <div className="hidden md:flex flex-col gap-4 absolute top-4 right-4 z-10 items-end">
               <FlagButton />
+              <MaleIcon />
+              <FemaleIcon />
             </div>
           </div>
           {/* Divider with gradient border */}
@@ -94,7 +100,8 @@ export default function VideoChatPage() {
             ) : (
               <MockVideo flip imgSrc="/no_user.png" />
             )}
-            <div className="absolute top-3 right-4 flex items-center">
+            {/* Desktop: DiamondCountBar at top-right of right screen */}
+            <div className="hidden md:block absolute top-3 right-4 z-10">
               <DiamondCountBar count={3900} />
             </div>
             {/* Chat overlay/input */}
@@ -111,6 +118,16 @@ export default function VideoChatPage() {
             <button>
               <img src="/swipe.png" alt="Swipe" className="w-33 h-33 mx-auto" />
             </button>
+          </div>
+        </div>
+
+        {/* Mobile Layout: DiamondCountBar, Flag, Male, Female icons stacked vertically */}
+        <div className="md:hidden flex flex-col gap-4 absolute top-4 right-1 z-20 items-center">
+          <DiamondCountBar count={39000} />
+          <div className="flex flex-col gap-4 items-end">
+            <FlagButton />
+            <MaleIcon />
+            <FemaleIcon />
           </div>
         </div>
       </div>

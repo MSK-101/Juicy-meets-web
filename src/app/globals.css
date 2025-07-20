@@ -84,11 +84,6 @@ body {
   border-color: #dcd9e0 !important;
 }
 
-.conic-gradient-btn {
-  position: relative;
-  overflow: hidden;
-  z-index: 0;
-}
 
 .diamond-animated-btn {
   position: relative;
@@ -158,35 +153,37 @@ body {
   background-size: 200% 200%;
   animation: gradientShift 6s ease infinite;
 }
-/* Conic gradient for md and up */
-.conic-gradient-btn {
-  position: relative;
-  overflow: hidden;
-  z-index: 0;
-  border-radius: 1.5rem;
-  background-color: #120020;
+
+
+.rotating-border-btn {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  border-radius: 2.5rem;
+  border: 4px solid transparent;
+  animation: gradientBorder 3s linear infinite;
+  background:
+    linear-gradient(to right, #330457, #1e0333) content-box,
+    conic-gradient(
+      from var(--angle),
+      #570b92 0deg,
+      #f36fff 53.3deg,
+      #268aff 90.46deg,
+      #52eaea 126.24deg,
+      #120020 178.82deg,
+      #4a0281 360deg
+    ) border-box;
 }
 
-.conic-gradient-btn::before {
-  content: "";
-  position: absolute;
-  inset: -90%;
-  z-index: -1;
-  background: conic-gradient(
-    from 0deg at 50% 50%,
-    #268aff 0deg,
-    #f36fff 53.3deg,
-    #268aff 90.46deg,
-    #52eaea 126.24deg,
-    #f36fff 178.82deg,
-    #52eaea 360deg
-  );
-  animation: spin 4s linear infinite;
+@property --angle {
+  syntax: "<angle>";
+  inherits: true;
+  initial-value: 0turn;
 }
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
+
+@keyframes gradientBorder {
+  from { --angle: 0turn; }
+  to { --angle: 1turn; }
 }
 
 .plan-swiper .swiper-pagination-bullet {

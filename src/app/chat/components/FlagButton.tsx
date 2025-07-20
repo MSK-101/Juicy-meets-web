@@ -4,14 +4,14 @@ export default function FlagButton() {
   const [showModal, setShowModal] = useState(false);
 
   return (
-    <div className="relative flex items-center justify-center">
+    <div className="relative">
       <button
-        className="w-12 h-12 gradient-border rounded-full bg-black border-2"
+        className="w-12 h-12 gradient-border rounded-full bg-black border-2 flex items-center justify-center"
         onClick={() => setShowModal(true)}
         aria-label="Report"
       >
         {/* Flag PNG icon */}
-        <img src="/flag.png" alt="Flag" className="mx-auto" style={{ width: 25, height: 21 }} />
+        <img src="/flag.png" alt="Flag" className="w-5 h-4 md:w-[25px] md:h-[21px]" />
       </button>
       {/* Modal/Alert */}
       {showModal && (
