@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { adminApi } from "@/lib/admin-api";
 import { Video } from "@/lib/admin-types";
 import DataTable from "@/components/admin/DataTable";
@@ -8,6 +9,7 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faSearch } from "@fortawesome/free-solid-svg-icons";
 
 export default function Videos() {
+  const router = useRouter();
   const [videos, setVideos] = useState<Video[]>([]);
   const [pools, setPools] = useState<string[]>([]);
   const [sequences, setSequences] = useState<string[]>([]);
@@ -86,7 +88,7 @@ export default function Videos() {
                 placeholder="Search"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent w-64"
+                className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent w-64 bg-white text-black font-poppins"
               />
               <FontAwesomeIcon
                 icon={faSearch}
@@ -94,7 +96,10 @@ export default function Videos() {
               />
             </form>
           </div>
-          <button className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors">
+          <button
+            onClick={() => router.push("/admin/videos/add")}
+            className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors font-poppins"
+          >
             + Add New Video
           </button>
         </div>
@@ -104,7 +109,7 @@ export default function Videos() {
         <select
           value={poolFilter}
           onChange={(e) => setPoolFilter(e.target.value)}
-          className="border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+          className="border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white text-black font-poppins focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
         >
           <option value="">Pool A</option>
           {pools.map((pool) => (
@@ -117,7 +122,7 @@ export default function Videos() {
         <select
           value={sequenceFilter}
           onChange={(e) => setSequenceFilter(e.target.value)}
-          className="border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+          className="border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white text-black font-poppins focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
         >
           <option value="">Sequence 1</option>
           {sequences.map((sequence) => (
@@ -127,8 +132,9 @@ export default function Videos() {
           ))}
         </select>
       </div>
-
-      <DataTable columns={columns} data={videos as unknown as Record<string, unknown>[]} />
+      <div className="bg-gray-100 rounded-2xl p-4 shadow-md">
+        <DataTable columns={columns} data={videos as unknown as Record<string, unknown>[]} />
+      </div>
     </div>
   );
 }

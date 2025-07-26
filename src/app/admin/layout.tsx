@@ -48,7 +48,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   }
 
   return (
-    <div className="min-h-screen bg-white admin-panel">
+    <div className=" bg-white admin-panel">
       <div className="flex">
         <AdminSidebar />
         <div className="flex-1 flex flex-col">

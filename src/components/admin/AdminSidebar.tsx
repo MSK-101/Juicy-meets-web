@@ -14,6 +14,7 @@ import {
   faChartPie,
   faCog,
   faFileAlt,
+  faSignOutAlt,
 } from "@fortawesome/free-solid-svg-icons";
 
 const navigationItems = [
@@ -61,6 +62,11 @@ const navigationItems = [
     name: "Reports",
     href: "/admin/reports",
     icon: faFileAlt,
+  },
+  {
+    name: "Logout",
+    href: "/admin/login",
+    icon: faSignOutAlt,
   },
 ];
 
