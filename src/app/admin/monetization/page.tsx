@@ -221,9 +221,9 @@ export default function Monetization() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 min-h-full">
       {/* Header with Date Filter */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <h1 className="text-2xl font-semibold text-gray-900 font-poppins">Monetization</h1>
         <select
           value={dateFilter}
@@ -238,7 +238,7 @@ export default function Monetization() {
       </div>
 
       {/* Stats Cards */}
-      <div className="flex gap-6 items-center">
+      <div className="flex gap-4 lg:gap-6 items-center">
         <StatCard
           title="Total Revenue"
           value={`$${data.stats.totalRevenue.toLocaleString()}`}

@@ -240,7 +240,7 @@ export default function PaidStaff() {
       )
     },
     { key: "regDate", label: "Reg. Date" },
-              {
+                        {
        key: "action",
        label: "Action",
        render: (_value: unknown, row: Record<string, unknown>): React.ReactNode => (
@@ -262,19 +262,19 @@ export default function PaidStaff() {
     );
   }
 
-  return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    return (
+    <div className="space-y-6 min-h-full">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <h1 className="text-2xl font-semibold text-gray-900 font-poppins">Paid Staff</h1>
-        <div className="flex items-center space-x-4">
-          <div className="relative">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-4 w-full sm:w-auto">
+          <div className="relative w-full sm:w-auto">
             <form onSubmit={handleSearch} className="flex items-center space-x-2">
               <input
                 type="text"
                 placeholder="Search"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent w-64 bg-white text-black font-poppins"
+                className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent w-full sm:w-64 bg-white text-black font-poppins"
               />
               <FontAwesomeIcon
                 icon={faSearch}
@@ -284,7 +284,7 @@ export default function PaidStaff() {
           </div>
           <button
             onClick={() => router.push("/admin/paid-staff/add")}
-            className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors font-poppins"
+            className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors font-poppins w-full sm:w-auto"
           >
             + Add Staff
           </button>

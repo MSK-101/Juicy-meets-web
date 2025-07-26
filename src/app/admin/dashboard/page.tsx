@@ -53,8 +53,8 @@ export default function Dashboard() {
   ];
 
   return (
-    <div className="space-y-6 rounded-2xl pb-6">
-      <div className="flex items-center justify-between">
+    <div className="space-y-6 rounded-2xl pb-6 min-h-full">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <h1 className="font-semibold text-gray-900 font-poppins">Total Users</h1>
         <select
            value={userFilter}
@@ -67,7 +67,7 @@ export default function Dashboard() {
         </select>
       </div>
 
-      <div className="flex gap-6 items-center">
+      <div className="flex gap-4 lg:gap-6 items-center">
         <StatCard
           title="Views"
           value={data.stats.views.toLocaleString()}

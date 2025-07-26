@@ -31,7 +31,7 @@ export default function StatCard({
 
   return (
     <div
-      className="w-[272px] h-[120px] p-6 text-white transition-all duration-300 hover:scale-105 hover:shadow-xl cursor-pointer rounded-2xl border-gray-700"
+      className="flex-1 min-w-0 h-[120px] p-4 sm:p-6 text-white transition-all duration-300 hover:scale-105 hover:shadow-xl cursor-pointer rounded-2xl border-gray-700"
       style={{ background: isOdd ? gradientBackground : darkBackground }}
     >
       <div className="flex flex-col h-full">

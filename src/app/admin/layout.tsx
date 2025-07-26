@@ -48,11 +48,11 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   }
 
   return (
-    <div className=" bg-white admin-panel">
-      <div className="flex">
+    <div className="min-h-screen bg-white admin-panel">
+      <div className="flex min-h-screen">
         <AdminSidebar />
-        <div className="flex-1 flex flex-col">
-          <main className="flex-1 p-6">{children}</main>
+        <div className="flex-1 flex flex-col min-h-screen">
+          <main className="flex-1 p-6 bg-white">{children}</main>
         </div>
       </div>
     </div>

@@ -74,7 +74,7 @@ export default function AdminSidebar() {
   const pathname = usePathname();
 
   return (
-    <div className="w-64 bg-[#f5f5f5] min-h-screen px-6 py-6 font-poppins">
+    <div className="w-64 bg-[#f5f5f5] min-h-screen px-6 py-6 font-poppins flex-shrink-0">
       {/* Logo */}
       <div className="flex justify-center mb-8">
         <div className="w-10 h-10 rounded-lg bg-black flex items-center justify-center">

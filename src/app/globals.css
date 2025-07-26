@@ -47,6 +47,8 @@ body {
 /* Admin panel specific styles - override default fonts */
 .admin-panel {
   font-family: "Poppins", sans-serif !important;
+  background-color: white !important;
+  min-height: 100vh;
 }
 
 /* Ensure specific elements use Poppins only within admin panel */
