@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import Image from "next/image";
 import {
   faChartBar,
   faUsers,
@@ -76,10 +77,16 @@ export default function AdminSidebar() {
   return (
     <div className="w-64 bg-[#f5f5f5] min-h-screen px-6 py-6 font-poppins flex-shrink-0">
       {/* Logo */}
-      <div className="flex justify-center mb-8">
-        <div className="w-10 h-10 rounded-lg bg-black flex items-center justify-center">
-          <span className="text-white text-5xl font-bold">N</span>
-        </div>
+      <div className="flex py-3 justify-center mb-8">
+        <Link href="/admin/dashboard">
+          <Image
+            src='/admin_logo.png'
+            alt="Juicy Meets"
+            width={56}
+            height={40}
+            className="h-8 w-auto cursor-pointer hover:scale-105 duration-300"
+          />
+        </Link>
       </div>
 
       {/* Navigation */}

@@ -203,9 +203,9 @@ export default function PaidStaff() {
     {
       key: "totalActivityTime",
       label: "Total Activity Time",
-      render: (value: unknown, row: Record<string, unknown>) => (
+      render: (value: unknown): React.ReactNode => (
         <div className="flex items-center space-x-2">
-          <span>{value}</span>
+          <span>{String(value)}</span>
           <select className="text-xs border-none bg-transparent text-gray-500">
             <option>Today</option>
             <option>Weekly</option>
@@ -217,7 +217,7 @@ export default function PaidStaff() {
     {
       key: "onlineStatus",
       label: "Online/Offline Status",
-      render: (value: unknown) => (
+      render: (value: unknown): React.ReactNode => (
         <div className="flex items-center space-x-2">
           <div className={`w-2 h-2 rounded-full ${value === 'online' ? 'bg-green-500' : 'bg-gray-400'}`}></div>
           <span className={`text-sm ${value === 'online' ? 'text-green-600' : 'text-gray-500'}`}>
@@ -230,7 +230,7 @@ export default function PaidStaff() {
     {
       key: "status",
       label: "Status",
-      render: (value: unknown) => (
+      render: (value: unknown): React.ReactNode => (
         <div className="flex items-center space-x-2">
           <div className={`w-2 h-2 rounded-full ${value === 'active' ? 'bg-green-500' : 'bg-gray-400'}`}></div>
           <span className={`text-sm ${value === 'active' ? 'text-green-600' : 'text-gray-500'}`}>
