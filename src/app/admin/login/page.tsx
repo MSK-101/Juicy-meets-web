@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 
 export default function AdminLogin() {
   const [credentials, setCredentials] = useState({
@@ -37,9 +38,7 @@ export default function AdminLogin() {
       <div className="max-w-md w-full space-y-8">
         <div>
           <div className="flex justify-center">
-            <div className="w-12 h-12 bg-black rounded flex items-center justify-center">
-              <span className="text-white font-bold text-xl">N</span>
-            </div>
+            <Image src="/admin_logo.png" alt="Juicy Meets" width={56} height={40} />
           </div>
           <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
             Admin Login
