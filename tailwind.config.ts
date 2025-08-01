@@ -14,10 +14,12 @@ const config: Config = {
       fontFamily: {
         heading: ["Cift", "Playfair Display", "serif"],
         body: ["Reaktif", "Roboto", "sans-serif"],
+        poppins: ["Poppins", "sans-serif"],
+        sans: ["Reaktif", "Roboto", "sans-serif"], // Keep original sans font for main app
       },
     },
   },
-  plugins: [require("tailwindcss-animate")],
+  plugins: [],
 };
 
 export default config;

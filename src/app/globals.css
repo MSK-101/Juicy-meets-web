@@ -44,13 +44,53 @@ body {
   color: var(--foreground);
 }
 
-h1,
-h2 {
+/* Admin panel specific styles - override default fonts */
+.admin-panel {
+  font-family: "Poppins", sans-serif !important;
+}
+
+/* Ensure specific elements use Poppins only within admin panel */
+.admin-panel h1,
+.admin-panel h2,
+.admin-panel h3,
+.admin-panel h4,
+.admin-panel h5,
+.admin-panel h6,
+.admin-panel p,
+.admin-panel span,
+.admin-panel div,
+.admin-panel button,
+.admin-panel input,
+.admin-panel select,
+.admin-panel textarea,
+.admin-panel a,
+.admin-panel li,
+.admin-panel label {
+  font-family: "Poppins", sans-serif !important;
+}
+
+/* Keep original fonts for main app */
+body {
+  font-family: "Reaktif", "Roboto", sans-serif;
+}
+
+/* Ensure main app elements use original fonts */
+h1, h2, h3, h4, h5, h6 {
   font-family: "Cift", "Playfair Display", serif;
 }
 
-body {
-  font-family: "Reaktif", "Roboto", sans-serif;
+/* Only apply Poppins to admin panel, not to main app */
+.admin-panel {
+  font-family: "Poppins", sans-serif !important;
+}
+
+.admin-panel h1,
+.admin-panel h2,
+.admin-panel h3,
+.admin-panel h4,
+.admin-panel h5,
+.admin-panel h6 {
+  font-family: "Poppins", sans-serif !important;
 }
 
 .gradient-border,
