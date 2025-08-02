@@ -2,10 +2,13 @@
 
 import Image from "next/image";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../ui/dialog";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faArrowRightToBracket } from "@fortawesome/free-solid-svg-icons";
-import Link from "next/link";
-import { Input } from "../ui/input";
+import { useState } from "react";
+import { useUser } from "@/store/auth";
+import ForgotPasswordDialog from "./forgot-password-dialog";
+import RegisterDialog from "./register-dialog";
+import Toast from "../ui/toast";
+import LoginForm from "../auth/login-form";
+import UserInfo from "../auth/user-info";
 
 // Add prop types for the dialog
 interface dialogProps {
@@ -17,50 +20,90 @@ export default function LoginDialog({
   showDialog,
   setShowDialog,
 }: dialogProps) {
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [showRegister, setShowRegister] = useState(false);
+  const [toast, setToast] = useState<{ message: string; type: "success" | "error"; isVisible: boolean }>({
+    message: "",
+    type: "success",
+    isVisible: false,
+  });
+
+  const user = useUser();
+
   return (
-    <Dialog open={showDialog} onOpenChange={setShowDialog}>
-      <DialogContent className="border md:border-[3px] gradient-border rounded-2xl md:rounded-3xl w-[90%] md:w-[60%]">
-        <DialogHeader>
-          <DialogTitle className="flex justify-center items-center h-[35px] md:h-[50px]">
-            <Image src="/logo.png" alt="Juicy Meets" width={40} height={41} />
-          </DialogTitle>
-        </DialogHeader>
-        <div className="flex flex-col items-center">
-          <h1 className="font-bold w-full max-w-[675px] text-2xl md:text-4xl text-center mt-10">
-            Welcome to Juicy Meets Chats.
-          </h1>
-          <p className="mt-6 w-full max-w-[675px] font-light leading-[100%] md:leading-[160%] text-lg md:text-xl text-center">
-            Today is a new day. It&apos;s your day. You shape it. Sign in to
-            start chatting with strangers & make friends.
-          </p>
-        </div>
+    <>
+      <Dialog open={showDialog} onOpenChange={setShowDialog}>
+        <DialogContent className="border md:border-[3px] gradient-border rounded-2xl md:rounded-3xl w-[90%] md:w-[60%]">
+          <DialogHeader>
+            <DialogTitle className="flex justify-center items-center h-[35px] md:h-[50px]">
+              <Image src="/logo.png" alt="Juicy Meets" width={40} height={41} />
+            </DialogTitle>
+          </DialogHeader>
 
-        <div className="flex flex-col items-center gap-4 mt-14">
-          <Input
-            type="email"
-            placeholder="Email"
-            className="w-full max-w-[398px]"
-            id="email"
-          />
-          <Input
-            type="password"
-            placeholder="Password"
-            className="w-full max-w-[398px]"
-            id="password"
-          />
-          <button className="bg-linear-180 from-[#420099] to-[#9747FF] rounded-xl py-3 w-full max-w-[398px] cursor-pointer flex gap-3 justify-center">
-            <FontAwesomeIcon
-              icon={faArrowRightToBracket}
-              className="text-[20px]"
+          {user ? (
+            // User is logged in - show user info and logout
+            <UserInfo
+              user={user}
+              onLogoutSuccess={() => {
+                setToast({
+                  message: "Successfully logged out!",
+                  type: "success",
+                  isVisible: true,
+                });
+              }}
             />
-            Sign in
-          </button>
+          ) : (
+            // User is not logged in - show login form
+            <>
+              <LoginForm
+                onSuccess={() => {
+                  setToast({
+                    message: "Successfully logged in!",
+                    type: "success",
+                    isVisible: true,
+                  });
+                  setShowDialog(false);
+                }}
+                onError={(message) => {
+                  setToast({
+                    message,
+                    type: "error",
+                    isVisible: true,
+                  });
+                }}
+              />
 
-          <Link href="#" className="mt-5">
-            Forgot your Password?
-          </Link>
-        </div>
-      </DialogContent>
-    </Dialog>
+              <div className="flex flex-col items-center gap-4 mt-4">
+                <button
+                  type="button"
+                  onClick={() => setShowForgotPassword(true)}
+                  className="underline"
+                >
+                  Forgot your Password?
+                </button>
+
+              </div>
+            </>
+          )}
+        </DialogContent>
+
+        <ForgotPasswordDialog
+          showDialog={showForgotPassword}
+          setShowDialog={setShowForgotPassword}
+        />
+
+        <RegisterDialog
+          showDialog={showRegister}
+          setShowDialog={setShowRegister}
+        />
+      </Dialog>
+
+      <Toast
+        message={toast.message}
+        type={toast.type}
+        isVisible={toast.isVisible}
+        onClose={() => setToast(prev => ({ ...prev, isVisible: false }))}
+      />
+    </>
   );
 }

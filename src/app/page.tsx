@@ -9,12 +9,14 @@ import { useRouter } from "next/navigation";
 import PlansDialog from "@/components/dialogs/plans-dialog";
 import ImageSlider from "../components/image-slider";
 import MobileImageSlider from "@/components/mobile-image-slider";
+import { useUser } from "@/store/auth";
 
 export default function Home() {
   const [showLoginDialog, setShowLoginDialog] = useState(false);
   const [showUserDetailsDialog, setUserDetailsDialog] = useState(false);
   const [showPlansDialog, setShowPlansDialog] = useState(false);
   const router = useRouter();
+  const user = useUser();
 
   const startVideoChatHandler = () => {
     if (typeof window !== "undefined") {
@@ -49,14 +51,30 @@ export default function Home() {
             Chatters
           </div>
 
-          <button
-            className="bg-linear-180 from-[#420099] to-[#9747FF] cursor-pointer px-5 py-2 rounded-full"
-            onClick={() => {
-              setShowLoginDialog(true);
-            }}
-          >
-            Log In
-          </button>
+          {user ? (
+            <div className="flex items-center gap-3">
+              <span className="text-white text-sm hidden md:block">
+                {user.email}
+              </span>
+              <button
+                className="bg-linear-180 from-[#420099] to-[#9747FF] cursor-pointer px-5 py-2 rounded-full"
+                onClick={() => {
+                  setShowLoginDialog(true);
+                }}
+              >
+                Account
+              </button>
+            </div>
+          ) : (
+            <button
+              className="bg-linear-180 from-[#420099] to-[#9747FF] cursor-pointer px-5 py-2 rounded-full"
+              onClick={() => {
+                setShowLoginDialog(true);
+              }}
+            >
+              Log In
+            </button>
+          )}
           <LoginDialog
             showDialog={showLoginDialog}
             setShowDialog={setShowLoginDialog}

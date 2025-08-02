@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { QueryProvider } from "@/providers/QueryProvider";
+import { GlobalError } from "@/components/GlobalError";
 
 export const metadata: Metadata = {
   title: "Juicy Meets - Video Chat Platform",
@@ -20,7 +22,12 @@ export default function RootLayout({
           rel="stylesheet"
         />
       </head>
-      <body>{children}</body>
+      <body>
+        <QueryProvider>
+          <GlobalError />
+          {children}
+        </QueryProvider>
+      </body>
     </html>
   );
 }
