@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import Image from "next/image";
@@ -17,6 +17,7 @@ import {
   faFileAlt,
   faSignOutAlt,
 } from "@fortawesome/free-solid-svg-icons";
+import { useAdminLogout } from "@/app/admin/api/hooks/useAdminAuthQueries";
 
 const navigationItems = [
   {
@@ -64,15 +65,20 @@ const navigationItems = [
     href: "/admin/reports",
     icon: faFileAlt,
   },
-  {
-    name: "Logout",
-    href: "/admin/login",
-    icon: faSignOutAlt,
-  },
 ];
 
 export default function AdminSidebar() {
   const pathname = usePathname();
+  const router = useRouter();
+  const { mutate: logout, isPending } = useAdminLogout();
+
+  const handleLogout = () => {
+    logout(undefined, {
+      onSuccess: () => {
+        router.push("/admin/login");
+      },
+    });
+  };
 
   return (
     <div className="w-64 bg-[#f5f5f5] min-h-screen px-6 py-6 font-poppins flex-shrink-0">
@@ -127,6 +133,25 @@ export default function AdminSidebar() {
             </Link>
           );
         })}
+
+        {/* Logout Button */}
+        <button
+          onClick={handleLogout}
+          disabled={isPending}
+          className={cn(
+            "flex items-center rounded-2xl mb-6 px-4 py-3 transition-all duration-200 w-full hover:bg-gray-200"
+          )}
+        >
+          <div className="w-8 h-8 rounded-lg flex items-center justify-center mr-3 flex-shrink-0 bg-white">
+            <FontAwesomeIcon
+              icon={faSignOutAlt}
+              className="w-4 h-4 text-black"
+            />
+          </div>
+          <span className="ml-2 text-md font-sm text-black">
+            {isPending ? "Logging out..." : "Logout"}
+          </span>
+        </button>
       </nav>
     </div>
   );
