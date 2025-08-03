@@ -1,17 +1,27 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faArrowLeft } from "@fortawesome/free-solid-svg-icons";
-import { useCreateVideo } from "@/api/hooks/useVideosQueries";
+import { useUpdateVideo, useVideo } from "@/api/hooks/useVideosQueries";
 import { usePools, useSequences } from "@/api/hooks/usePoolsQueries";
 import { useVideoFilters } from "@/api/hooks/useVideosQueries";
 import FileUploader from "@/components/FileUploader";
-import type { CreateVideoRequest } from "@/api/services/videosService";
+import type { UpdateVideoRequest } from "@/api/services/videosService";
+import { use } from "react";
 
-export default function AddVideo() {
+interface EditVideoPageProps {
+  params: Promise<{
+    id: string;
+  }>;
+}
+
+export default function EditVideoPage({ params }: EditVideoPageProps) {
   const router = useRouter();
+  const resolvedParams = use(params);
+  const videoId = parseInt(resolvedParams.id);
+
   const [formData, setFormData] = useState({
     name: "",
     gender: "",
@@ -21,15 +31,36 @@ export default function AddVideo() {
   });
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [currentVideoUrl, setCurrentVideoUrl] = useState<string | null>(null);
 
   // Fetch data
+  const { data: videoData, isLoading: videoLoading, error: videoError } = useVideo(videoId);
   const { data: poolsData, isLoading: poolsLoading } = usePools();
   const { data: filtersData, isLoading: filtersLoading } = useVideoFilters();
   const { data: sequencesData, isLoading: sequencesLoading } = useSequences(
     formData.pool_id ? Number(formData.pool_id) : 0
   );
 
-  const createVideoMutation = useCreateVideo();
+  const updateVideoMutation = useUpdateVideo();
+
+  // Initialize form data when video data is loaded
+  useEffect(() => {
+    if (videoData) {
+      const video = videoData;
+      setFormData({
+        name: video.name,
+        gender: video.gender,
+        status: video.status,
+        pool_id: video.pool.id.toString(),
+        sequence_id: video.sequence.id.toString(),
+      });
+
+      // Set current video URL if it exists
+      if (video.video_file_url) {
+        setCurrentVideoUrl(video.video_file_url);
+      }
+    }
+  }, [videoData]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -93,7 +124,8 @@ export default function AddVideo() {
       newErrors.sequence_id = "Please select a sequence";
     }
 
-    if (!selectedFile) {
+    // Only require video file if there's no current video and no selected file
+    if (!currentVideoUrl && !selectedFile) {
       newErrors.video_file = "Please select a video file";
     }
 
@@ -108,42 +140,32 @@ export default function AddVideo() {
       return;
     }
 
-    if (!selectedFile) {
-      setErrors(prev => ({ ...prev, video_file: "Please select a video file" }));
-      return;
-    }
-
-    const videoData: CreateVideoRequest = {
+    const videoData: UpdateVideoRequest = {
       name: formData.name,
       gender: formData.gender as 'male' | 'female' | 'other',
       status: formData.status as 'active' | 'pending' | 'inactive',
       pool_id: Number(formData.pool_id),
       sequence_id: Number(formData.sequence_id),
-      video_file: selectedFile,
+      ...(selectedFile && { video_file: selectedFile }),
     };
 
     try {
-      await createVideoMutation.mutateAsync(videoData);
+      await updateVideoMutation.mutateAsync({ id: videoId, data: videoData });
       router.push("/admin/videos");
                  } catch (error: unknown) {
-      console.error("Error creating video:", error);
+      console.error("Error updating video:", error);
       // Handle specific error messages from the API
-      if (error && typeof error === 'object' && 'response' in error) {
-        const response = (error as { response?: { data?: { errors?: Record<string, unknown> } } }).response;
-        if (response?.data?.errors) {
-          const apiErrors = response.data.errors;
-          const newErrors: Record<string, string> = {};
+      if (error.response?.data?.errors) {
+        const apiErrors = error.response.data.errors;
+        const newErrors: Record<string, string> = {};
 
-          Object.keys(apiErrors).forEach(key => {
-            newErrors[key] = Array.isArray(apiErrors[key]) ? apiErrors[key][0] : apiErrors[key];
-          });
+        Object.keys(apiErrors).forEach(key => {
+          newErrors[key] = Array.isArray(apiErrors[key]) ? apiErrors[key][0] : apiErrors[key];
+        });
 
-          setErrors(newErrors);
-        } else {
-          setErrors({ general: "Failed to create video" });
-        }
+        setErrors(newErrors);
       } else {
-        setErrors({ general: error instanceof Error ? error.message : "Failed to create video" });
+        setErrors({ general: error.message || "Failed to update video" });
       }
     }
   };
@@ -152,10 +174,32 @@ export default function AddVideo() {
   const sequences = sequencesData || [];
   const filters = filtersData || { genders: [], statuses: [] };
 
-  if (poolsLoading || filtersLoading) {
+  if (videoLoading || poolsLoading || filtersLoading) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
+      </div>
+    );
+  }
+
+  if (videoError) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">Error loading video</h3>
+          <p className="text-gray-600">Please try again later.</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!videoData) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">Video not found</h3>
+          <p className="text-gray-600">The video you&apos;re looking for doesn&apos;t exist.</p>
+        </div>
       </div>
     );
   }
@@ -172,13 +216,34 @@ export default function AddVideo() {
             <FontAwesomeIcon icon={faArrowLeft} className="w-4 h-4" />
             <span className="font-poppins">Back</span>
           </button>
-          <h1 className="text-2xl font-semibold text-gray-900 font-poppins">Add New Video</h1>
+          <h1 className="text-2xl font-semibold text-gray-900 font-poppins">Edit Video</h1>
         </div>
       </div>
 
       {/* Form */}
       <div className="bg-gray-100 rounded-2xl p-6 shadow-md">
         <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Current Video Preview */}
+          {currentVideoUrl && !selectedFile && (
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700 font-poppins">
+                Current Video
+              </label>
+              <div className="border border-gray-300 rounded-lg p-4 bg-white">
+                <video
+                  className="w-full max-h-64 rounded"
+                  controls
+                  src={currentVideoUrl}
+                >
+                  Your browser does not support the video tag.
+                </video>
+                <p className="text-sm text-gray-600 mt-2">
+                  This is the currently uploaded video. Upload a new file below to replace it.
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* Video Upload */}
           <FileUploader
             onFileSelect={handleFileSelect}
@@ -186,11 +251,21 @@ export default function AddVideo() {
             selectedFile={selectedFile}
             accept="video/*"
             maxSize={100}
-            label="Video Upload"
-            placeholder="Click to upload or drag and drop video file"
+            label={currentVideoUrl ? "Replace Video (Optional)" : "Video Upload"}
+            placeholder={currentVideoUrl
+              ? "Click to upload or drag and drop new video file to replace current video"
+              : "Click to upload or drag and drop video file"
+            }
             error={errors.video_file}
-            disabled={createVideoMutation.isPending}
+            disabled={updateVideoMutation.isPending}
           />
+
+          {/* Note about current video */}
+          {currentVideoUrl && !selectedFile && (
+            <p className="text-sm text-gray-600 font-poppins">
+              💡 <strong>Note:</strong> If you don&apos;t upload a new video file, the current video will be kept unchanged.
+            </p>
+          )}
 
           {/* Video Name */}
           <div className="space-y-2">
@@ -343,16 +418,16 @@ export default function AddVideo() {
               type="button"
               onClick={() => router.back()}
               className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 font-poppins hover:bg-gray-50 transition-colors"
-              disabled={createVideoMutation.isPending}
+              disabled={updateVideoMutation.isPending}
             >
               Cancel
             </button>
             <button
               type="submit"
-              disabled={createVideoMutation.isPending || !selectedFile}
+              disabled={updateVideoMutation.isPending}
               className="px-6 py-2 bg-purple-600 text-white rounded-lg font-poppins hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {createVideoMutation.isPending ? "Uploading..." : "Upload Video"}
+              {updateVideoMutation.isPending ? "Updating..." : "Update Video"}
             </button>
           </div>
         </form>

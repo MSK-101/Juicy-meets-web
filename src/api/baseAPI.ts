@@ -39,8 +39,8 @@ export const apiRequest = async (
     }
 
     return data;
-  } catch (error: any) {
-    useErrorStore.getState().setError(error?.message || "An error occurred");
+  } catch (error: unknown) {
+    useErrorStore.getState().setError(error instanceof Error ? error.message : "An error occurred");
     throw error;
   }
 };

@@ -66,7 +66,7 @@ export default function ForgotPasswordDialog({
             Forgot Your Password?
           </h1>
           <p className="mt-6 w-full max-w-[675px] font-light leading-[100%] md:leading-[160%] text-lg md:text-xl text-center">
-            Enter your email address and we'll send you a new password.
+            Enter your email address and we&apos;ll send you a new password.
           </p>
         </div>
 

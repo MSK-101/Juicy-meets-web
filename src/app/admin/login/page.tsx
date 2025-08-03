@@ -3,8 +3,8 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import { useAdminLogin } from "../api/hooks/useAdminAuthQueries";
-import { useAdmin } from "../store/adminAuth";
+import { useAdminLogin } from "@/api/hooks/useAdminAuthQueries";
+import { useAdmin } from "@/store/adminAuth";
 
 export default function AdminLogin() {
   const [credentials, setCredentials] = useState({
@@ -39,14 +39,13 @@ export default function AdminLogin() {
     e.preventDefault();
     setError("");
 
-    login(credentials, {
-      onSuccess: () => {
-        router.push("/admin/dashboard");
-      },
-      onError: () => {
-        setError("Invalid credentials. Please try again.");
-      },
-    });
+    try {
+      await login(credentials);
+      router.push("/admin/dashboard");
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "Invalid credentials. Please try again.";
+      setError(errorMessage);
+    }
   };
 
   return (

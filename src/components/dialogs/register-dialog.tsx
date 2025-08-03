@@ -66,7 +66,7 @@ export default function RegisterDialog({
             Create Your Account
           </h1>
           <p className="mt-6 w-full max-w-[675px] font-light leading-[100%] md:leading-[160%] text-lg md:text-xl text-center">
-            Enter your email address and we'll create your account with a secure password.
+            Enter your email address and we&apos;ll create your account with a secure password.
           </p>
         </div>
 

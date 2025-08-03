@@ -17,7 +17,7 @@ import {
   faFileAlt,
   faSignOutAlt,
 } from "@fortawesome/free-solid-svg-icons";
-import { useAdminLogout } from "@/app/admin/api/hooks/useAdminAuthQueries";
+import { useAdminLogout } from "@/api/hooks/useAdminAuthQueries";
 
 const navigationItems = [
   {
