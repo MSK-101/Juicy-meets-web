@@ -163,6 +163,42 @@ export interface FileUploaderProps {
   disabled?: boolean;
 }
 
+// Coin package types
+export interface CoinPackage {
+  id: number;
+  name: string;
+  price: number;
+  coins_count: number;
+  price_per_coin: number;
+}
+
+export interface CoinPackagesResponse {
+  coin_packages: CoinPackage[];
+}
+
+// Purchase types
+export interface UserCoinPurchase {
+  id: number;
+  user_id: number;
+  coin_package_id: number;
+  coins_count: number;
+  price: number;
+  payment_status: 'pending' | 'completed' | 'failed' | 'refunded';
+  transaction_id: string;
+  purchased_at: string;
+  created_at: string;
+  updated_at: string;
+  coin_package: CoinPackage;
+}
+
+export interface CreatePurchaseRequest {
+  coin_package_id: number;
+}
+
+export interface PurchaseResponse {
+  purchase: UserCoinPurchase;
+}
+
 export interface PaginationProps {
   currentPage: number;
   totalPages: number;

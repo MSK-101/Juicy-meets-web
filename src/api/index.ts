@@ -2,6 +2,8 @@
 export { poolsService } from "./services/poolsService";
 export { videosService } from "./services/videosService";
 export { adminAuthService } from "./services/adminAuthService";
+export { coinPackagesService } from "./services/coinPackagesService";
+export { purchaseService } from "./services/purchaseService";
 
 // API Hooks
 export {
@@ -28,6 +30,14 @@ export {
 } from "./hooks/useVideosQueries";
 
 export {
+  useCoinPackages,
+} from "./hooks/useCoinPackagesQueries";
+
+export {
+  useCreatePurchase,
+} from "./hooks/usePurchaseQueries";
+
+export {
   useCurrentAdmin,
   useAdminLogin,
   useAdminLogout,
@@ -36,6 +46,8 @@ export {
 // API Base
 export { adminApi } from "./adminBaseAPI";
 export type { AdminAPIError } from "./adminBaseAPI";
+export { publicApi } from "./publicBaseAPI";
+export type { PublicAPIError } from "./publicBaseAPI";
 
 // Centralized Types
 export type {
@@ -65,6 +77,15 @@ export type {
   UpdateVideoRequest,
   VideoFilters,
   VideoListResponse,
+
+  // Coin package types
+  CoinPackage,
+  CoinPackagesResponse,
+
+  // Purchase types
+  UserCoinPurchase,
+  CreatePurchaseRequest,
+  PurchaseResponse,
 
   // Component props
   ModalProps,
