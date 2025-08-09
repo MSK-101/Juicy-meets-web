@@ -51,6 +51,11 @@ const navigationItems = [
     icon: faChartArea,
   },
   {
+    name: "Deduction Rules",
+    href: "/admin/deduction-rules",
+    icon: faCog,
+  },
+  {
     name: "Analytics",
     href: "/admin/analytics",
     icon: faChartPie,
@@ -98,7 +103,7 @@ export default function AdminSidebar() {
       {/* Navigation */}
       <nav className="space-y-2">
         {navigationItems.map((item) => {
-          const isActive = pathname === item.href;
+          const isActive = pathname.includes(item.href);
           return (
             <Link
               key={item.name}

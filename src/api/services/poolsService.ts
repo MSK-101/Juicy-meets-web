@@ -70,7 +70,7 @@ export const poolsService = {
   },
 
   async reorderSequences(poolId: number, sequenceIds: number[]): Promise<void> {
-    await adminApi.post(ENDPOINTS.reorderSequences(poolId), { sequence_ids: sequenceIds });
+    await adminApi.patch(ENDPOINTS.reorderSequences(poolId), { sequence_ids: sequenceIds });
   },
 };
 

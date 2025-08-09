@@ -3,6 +3,7 @@ export { poolsService } from "./services/poolsService";
 export { videosService } from "./services/videosService";
 export { adminAuthService } from "./services/adminAuthService";
 export { coinPackagesService } from "./services/coinPackagesService";
+export { deductionRulesService } from "./services/deductionRulesService";
 export { purchaseService } from "./services/purchaseService";
 
 // API Hooks
@@ -42,6 +43,14 @@ export {
   useAdminLogin,
   useAdminLogout,
 } from "./hooks/useAdminAuthQueries";
+
+export {
+  useDeductionRules,
+  useDeductionRule,
+  useCreateDeductionRule,
+  useUpdateDeductionRule,
+  useDeleteDeductionRule,
+} from "./hooks/useDeductionRulesQueries";
 
 // API Base
 export { adminApi } from "./adminBaseAPI";
