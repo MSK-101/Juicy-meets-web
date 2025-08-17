@@ -130,3 +130,6 @@ export default function DeductionRulesPage() {
     </div>
   );
 }
+
+
+

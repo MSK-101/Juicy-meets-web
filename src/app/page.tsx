@@ -20,16 +20,11 @@ export default function Home() {
 
   const startVideoChatHandler = () => {
     if (typeof window !== "undefined") {
-      const userDetails = localStorage.getItem("juicyMeetsUserDetails");
-      if (userDetails) {
-        // Generate a random chat id (e.g., 16 chars alphanumeric)
-        const randomId =
-          Math.random().toString(36).substring(2, 10) +
-          Math.random().toString(36).substring(2, 10);
-        router.push(`/chat/${randomId}`);
-      } else {
-        setUserDetailsDialog(true);
-      }
+      // Generate a random chat id (e.g., 16 chars alphanumeric)
+      const randomId =
+        Math.random().toString(36).substring(2, 10) +
+        Math.random().toString(36).substring(2, 10);
+      router.push(`/chat/${randomId}`);
     }
   };
 
