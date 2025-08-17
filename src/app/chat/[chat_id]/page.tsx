@@ -8,12 +8,9 @@ import ChatInput from "../components/ChatInput";
 import FlagButton from "../components/FlagButton";
 import MaleIcon from "../components/MaleIcon";
 import FemaleIcon from "../components/FemaleIcon";
+import { ChatMessage } from "@/components/ChatMessageContainer";
 
-// Define the message type
-interface ChatMessage {
-  sender: string;
-  text: string;
-}
+// Use imported ChatMessage interface
 
 export default function VideoChatPage() {
   const params = useParams();
@@ -33,6 +30,16 @@ export default function VideoChatPage() {
   const [isInitialized, setIsInitialized] = useState(false);
   const [userId, setUserId] = useState<string>('');
   const [isClient, setIsClient] = useState(false);
+
+  // Convert ChatMessage to format expected by ChatInput
+  const messagesForChatInput = React.useMemo(() => {
+    if (!userId) return [];
+    return messages.map(msg => ({
+      sender: msg.from === userId ? 'you' : 'partner',
+      text: msg.text,
+      timestamp: msg.timestamp
+    }));
+  }, [messages, userId]);
 
   // Check if we're on the client side
   useEffect(() => {
@@ -65,6 +72,14 @@ export default function VideoChatPage() {
         console.log('📺 Remote stream received on page');
         setRemoteStream(stream);
         setConnectionState('connected');
+
+        // Add welcome message when connection is established
+        const welcomeMessage: ChatMessage = {
+          from: 'system',
+          text: '🎉 Video chat connected! You can now send messages.',
+          timestamp: Date.now()
+        };
+        setMessages(prev => [...prev, welcomeMessage]);
       });
 
       cleanVideoChatService.onConnectionStateChange((state) => {
@@ -80,6 +95,19 @@ export default function VideoChatPage() {
         console.log('👋 Partner left on page');
         setRemoteStream(null);
         setConnectionState('disconnected');
+        // Clear messages when partner leaves
+        setMessages([]);
+      });
+
+      // Set up message listener
+      cleanVideoChatService.onMessageReceived((message) => {
+        console.log('💬 Message received on page:', message);
+        // Only add messages from other users, not from self
+        if (message.from !== currentUserId) {
+          setMessages(prev => [...prev, message]);
+        } else {
+          console.log('🔄 Ignoring own message:', message.text);
+        }
       });
 
       // Start video chat by joining queue
@@ -124,13 +152,28 @@ export default function VideoChatPage() {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  function handleSend(e?: React.FormEvent) {
+    async function handleSend(e?: React.FormEvent) {
     if (e) e.preventDefault();
     if (!input.trim()) return;
-    setMessages((prev) => {
-      return [...prev, { sender: "you", text: input.trim() }];
-    });
+
+    const newMessage: ChatMessage = {
+      from: userId,
+      text: input.trim(),
+      timestamp: Date.now()
+    };
+
+    // Add message locally immediately
+    setMessages((prev) => [...prev, newMessage]);
     setInput("");
+
+    // Send message via video chat service
+    if (connectionState === 'connected') {
+      try {
+        await cleanVideoChatService.sendMessage(input.trim());
+      } catch (error) {
+        console.error('❌ Failed to send message:', error);
+      }
+    }
   }
 
   return (
@@ -192,7 +235,7 @@ export default function VideoChatPage() {
 
             {/* Chat overlay/input */}
             <ChatInput
-              messages={messages}
+              messages={messagesForChatInput}
               input={input}
               setInput={setInput}
               handleSend={handleSend}

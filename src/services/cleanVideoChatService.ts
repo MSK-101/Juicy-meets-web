@@ -34,6 +34,7 @@ export class CleanVideoChatService {
   private onRemoteStreamCallback: ((stream: MediaStream) => void) | null = null;
   private onConnectionStateCallback: ((state: RTCPeerConnectionState) => void) | null = null;
   private onPartnerLeftCallback: (() => void) | null = null;
+  private onMessageReceivedCallback: ((message: { from: string; text: string; timestamp: number }) => void) | null = null;
 
   constructor() {
     this.userId = this.generateUserId();
@@ -144,6 +145,24 @@ export class CleanVideoChatService {
     return this.localStream;
   }
 
+    async sendMessage(text: string): Promise<void> {
+    if (!this.currentRoomId || !this.partnerId) {
+      console.log('⚠️ Cannot send message: not in a chat room');
+      return;
+    }
+
+    console.log('💬 Sending chat message:', text);
+
+    try {
+      // Use the existing PubNub sendMessage method
+      await pubnubService.sendMessage(text);
+
+      console.log('✅ Chat message sent via PubNub');
+    } catch (error) {
+      console.error('❌ Error sending chat message:', error);
+    }
+  }
+
   // Get remote stream (if available)
   getRemoteStream(): MediaStream | null {
     return this.remoteStream;
@@ -165,6 +184,10 @@ export class CleanVideoChatService {
 
   onPartnerLeft(callback: () => void): void {
     this.onPartnerLeftCallback = callback;
+  }
+
+  onMessageReceived(callback: (message: { from: string; text: string; timestamp: number }) => void): void {
+    this.onMessageReceivedCallback = callback;
   }
 
   // Private methods
@@ -223,6 +246,26 @@ export class CleanVideoChatService {
 
       console.log('📨 Received WebRTC signal via PubNub:', signal.type, 'from:', signal.from);
       this.handleIncomingSignal(signal);
+    });
+
+    // Set up general message listener for chat messages
+    pubnubService.onMessage((message) => {
+      console.log('💬 Received general message via PubNub:', message);
+      // Check if this is a chat message
+      if (message && typeof message === 'object' && 'sender' in message && 'text' in message) {
+        // Ignore messages from ourselves
+        if ((message as any).sender === this.userId) {
+          console.log('🔄 Ignoring own chat message:', (message as any).text);
+          return;
+        }
+
+        const chatMessage = {
+          from: (message as any).sender,
+          text: (message as any).text,
+          timestamp: (message as any).timestamp || Date.now()
+        };
+        this.handleChatMessage(chatMessage);
+      }
     });
   }
 
@@ -404,6 +447,9 @@ export class CleanVideoChatService {
         case 'ice-candidate':
           await this.handleIceCandidate(signal.data as RTCIceCandidateInit);
           break;
+        case 'chat-message':
+          this.handleChatMessage(signal.data as { text: string; from: string; timestamp: number });
+          break;
         default:
           console.log('⚠️ Unknown signal type:', signal.type);
       }
@@ -498,6 +544,18 @@ export class CleanVideoChatService {
     }
 
     this.iceCandidateQueue = [];
+  }
+
+    private handleChatMessage(messageData: { text: string; from: string; timestamp: number }): void {
+    console.log('💬 Received chat message:', messageData);
+
+    if (this.onMessageReceivedCallback) {
+      this.onMessageReceivedCallback({
+        from: messageData.from,
+        text: messageData.text,
+        timestamp: messageData.timestamp
+      });
+    }
   }
 
   private cleanup(): void {

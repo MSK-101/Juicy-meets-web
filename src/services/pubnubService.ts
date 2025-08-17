@@ -363,6 +363,36 @@ class PubNubService {
     });
   }
 
+  // Send custom chat message with custom format
+  async sendCustomMessage(messageData: { text: string; from: string; timestamp: number }): Promise<void> {
+    if (!this.isClient || !this.isInitialized) {
+      console.log('PubNub not available on server side');
+      return;
+    }
+
+    if (!this.pubnub || !this.currentChatId) {
+      throw new Error('Not connected to chat');
+    }
+
+    const message = {
+      type: 'chat-message',
+      data: messageData,
+      from: messageData.from,
+      chatId: this.currentChatId
+    };
+
+    try {
+      await this.pubnub.publish({
+        channel: this.getChatChannel(this.currentChatId),
+        message,
+      });
+      console.log('✅ Custom chat message sent via PubNub');
+    } catch (error) {
+      console.error('❌ Error sending custom chat message:', error);
+      throw error;
+    }
+  }
+
   // Send WebRTC signal via PubNub
   sendWebRTCSignal(signal: WebRTCSignal) {
     if (!this.isClient || !this.isInitialized || !this.pubnub || !this.currentChatId) {
