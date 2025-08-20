@@ -5,19 +5,7 @@ import { useRouter } from "next/navigation";
 import DataTable from "@/components/admin/DataTable";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faSearch, faEdit } from "@fortawesome/free-solid-svg-icons";
-
-interface Staff {
-  id: string;
-  name: string;
-  username: string;
-  email: string;
-  totalActivityTime: string;
-  period: string;
-  onlineStatus: "online" | "offline";
-  assignedGender: "M" | "F";
-  status: "active" | "disabled";
-  regDate: string;
-}
+import { staffService, Staff } from "@/api/services/staffService";
 
 export default function PaidStaff() {
   const router = useRouter();
@@ -28,173 +16,43 @@ export default function PaidStaff() {
   const [genderFilter, setGenderFilter] = useState("");
   const [timeFilter, setTimeFilter] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        // Mock data - replace with actual API call
-        const mockStaff: Staff[] = [
-          {
-            id: "1",
-            name: "Anna",
-            username: "anna143",
-            email: "anna143@gmail.com",
-            totalActivityTime: "5h20m",
-            period: "Today",
-            onlineStatus: "online",
-            assignedGender: "F",
-            status: "active",
-            regDate: "06/7/2025"
-          },
-          {
-            id: "2",
-            name: "Mark",
-            username: "mark09",
-            email: "mark09@gmail.com",
-            totalActivityTime: "1h20m",
-            period: "Today",
-            onlineStatus: "offline",
-            assignedGender: "M",
-            status: "active",
-            regDate: "04/24/2025"
-          },
-          {
-            id: "3",
-            name: "Jay",
-            username: "jay76",
-            email: "jay76@gmail.com",
-            totalActivityTime: "6h20m",
-            period: "Today",
-            onlineStatus: "online",
-            assignedGender: "M",
-            status: "active",
-            regDate: "05/15/2025"
-          },
-          {
-            id: "4",
-            name: "Adam",
-            username: "adam1",
-            email: "adam1@gmail.com",
-            totalActivityTime: "3h45m",
-            period: "Today",
-            onlineStatus: "offline",
-            assignedGender: "M",
-            status: "disabled",
-            regDate: "03/10/2025"
-          },
-          {
-            id: "5",
-            name: "William",
-            username: "william6789",
-            email: "william6789@gmail.com",
-            totalActivityTime: "4h10m",
-            period: "Today",
-            onlineStatus: "online",
-            assignedGender: "M",
-            status: "active",
-            regDate: "02/28/2025"
-          },
-          {
-            id: "6",
-            name: "Cambell",
-            username: "cambell876",
-            email: "cambell876@gmail.com",
-            totalActivityTime: "2h30m",
-            period: "Today",
-            onlineStatus: "offline",
-            assignedGender: "M",
-            status: "active",
-            regDate: "01/15/2025"
-          },
-          {
-            id: "7",
-            name: "Sara",
-            username: "sara098",
-            email: "sara098@gmail.com",
-            totalActivityTime: "7h15m",
-            period: "Today",
-            onlineStatus: "online",
-            assignedGender: "F",
-            status: "active",
-            regDate: "06/1/2025"
-          },
-          {
-            id: "8",
-            name: "Alison",
-            username: "alison678",
-            email: "alison678@gmail.com",
-            totalActivityTime: "1h45m",
-            period: "Today",
-            onlineStatus: "offline",
-            assignedGender: "F",
-            status: "active",
-            regDate: "05/20/2025"
-          },
-          {
-            id: "9",
-            name: "Greyi",
-            username: "greyi76",
-            email: "greyi76@gmail.com",
-            totalActivityTime: "5h50m",
-            period: "Today",
-            onlineStatus: "online",
-            assignedGender: "F",
-            status: "active",
-            regDate: "04/12/2025"
-          },
-          {
-            id: "10",
-            name: "Flora",
-            username: "flora65",
-            email: "flora65@gmail.com",
-            totalActivityTime: "3h20m",
-            period: "Today",
-            onlineStatus: "offline",
-            assignedGender: "F",
-            status: "disabled",
-            regDate: "03/25/2025"
-          },
-          {
-            id: "11",
-            name: "Marsh",
-            username: "marsh67",
-            email: "marsh67@gmail.com",
-            totalActivityTime: "4h40m",
-            period: "Today",
-            onlineStatus: "online",
-            assignedGender: "M",
-            status: "active",
-            regDate: "02/18/2025"
-          },
-          {
-            id: "12",
-            name: "Emma",
-            username: "emma234",
-            email: "emma234@gmail.com",
-            totalActivityTime: "6h30m",
-            period: "Today",
-            onlineStatus: "online",
-            assignedGender: "F",
-            status: "active",
-            regDate: "06/10/2025"
-          }
-        ];
-
-        setStaff(mockStaff);
-      } catch (error) {
-        console.error("Failed to fetch staff data:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchData();
+    fetchStaffData();
   }, [currentPage, onlineFilter, genderFilter, timeFilter, searchQuery]);
+
+  const fetchStaffData = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const staffData = await staffService.getStaff();
+      setStaff(staffData);
+    } catch (error) {
+      console.error("Failed to fetch staff data:", error);
+      setError("Failed to fetch staff data. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     setCurrentPage(1);
   };
+
+  // Filter staff based on search and filters
+  const filteredStaff = staff.filter((member) => {
+    const matchesSearch =
+      member.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      member.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      member.username.toLowerCase().includes(searchQuery.toLowerCase());
+
+    const matchesOnline = !onlineFilter || member.status === onlineFilter;
+    const matchesGender = !genderFilter || member.gender === genderFilter;
+
+    return matchesSearch && matchesOnline && matchesGender;
+  });
 
   const columns = [
     { key: "name", label: "Name" },
@@ -215,43 +73,53 @@ export default function PaidStaff() {
       )
     },
     {
-      key: "onlineStatus",
-      label: "Online/Offline Status",
-      render: (value: unknown): React.ReactNode => (
-        <div className="flex items-center space-x-2">
-          <div className={`w-2 h-2 rounded-full ${value === 'online' ? 'bg-green-500' : 'bg-gray-400'}`}></div>
-          <span className={`text-sm ${value === 'online' ? 'text-green-600' : 'text-gray-500'}`}>
-            {value === 'online' ? 'Online' : 'Offline'}
-          </span>
-        </div>
-      )
-    },
-    { key: "assignedGender", label: "Assigned Gender" },
-    {
       key: "status",
       label: "Status",
       render: (value: unknown): React.ReactNode => (
         <div className="flex items-center space-x-2">
+          <div className={`w-2 h-2 rounded-full ${
+            value === 'online' ? 'bg-green-500' :
+            value === 'in_chat' ? 'bg-blue-500' :
+            value === 'busy' ? 'bg-yellow-500' : 'bg-gray-400'
+          }`}></div>
+          <span className={`text-sm ${
+            value === 'online' ? 'text-green-600' :
+            value === 'in_chat' ? 'text-blue-600' :
+            value === 'busy' ? 'text-yellow-600' : 'text-gray-500'
+          }`}>
+            {value === 'online' ? 'Online' :
+             value === 'in_chat' ? 'In Chat' :
+             value === 'busy' ? 'Busy' : 'Offline'}
+          </span>
+        </div>
+      )
+    },
+    { key: "gender", label: "Gender" },
+    {
+      key: "assignmentStatus",
+      label: "Assignment Status",
+      render: (value: unknown): React.ReactNode => (
+        <div className="flex items-center space-x-2">
           <div className={`w-2 h-2 rounded-full ${value === 'active' ? 'bg-green-500' : 'bg-gray-400'}`}></div>
           <span className={`text-sm ${value === 'active' ? 'text-green-600' : 'text-gray-500'}`}>
-            {value === 'active' ? 'Active' : 'Disabled'}
+            {value === 'active' ? 'Active' : 'Inactive'}
           </span>
         </div>
       )
     },
     { key: "regDate", label: "Reg. Date" },
-                        {
-       key: "action",
-       label: "Action",
-       render: (_value: unknown, row: Record<string, unknown>): React.ReactNode => (
-         <button
-           onClick={() => router.push(`/admin/paid-staff/edit/${row.id}`)}
-           className="text-purple-600 hover:text-purple-700 transition-colors"
-         >
-           <FontAwesomeIcon icon={faEdit} className="w-4 h-4" />
-         </button>
-       )
-     },
+    {
+      key: "action",
+      label: "Action",
+      render: (_value: unknown, row: Record<string, unknown>): React.ReactNode => (
+        <button
+          onClick={() => router.push(`/admin/paid-staff/edit/${row.id}`)}
+          className="text-purple-600 hover:text-purple-700 transition-colors"
+        >
+          <FontAwesomeIcon icon={faEdit} className="w-4 h-4" />
+        </button>
+      )
+    },
   ];
 
   if (loading) {
@@ -262,7 +130,23 @@ export default function PaidStaff() {
     );
   }
 
+  if (error) {
     return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <p className="text-red-600 mb-4">{error}</p>
+          <button
+            onClick={fetchStaffData}
+            className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
     <div className="space-y-6 min-h-full">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <h1 className="text-2xl font-semibold text-gray-900 font-poppins">Paid Staff</h1>
@@ -297,8 +181,10 @@ export default function PaidStaff() {
           onChange={(e) => setOnlineFilter(e.target.value)}
           className="border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white text-black font-poppins focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
         >
-          <option value="">Online</option>
+          <option value="">Status</option>
           <option value="online">Online</option>
+          <option value="in_chat">In Chat</option>
+          <option value="busy">Busy</option>
           <option value="offline">Offline</option>
         </select>
 
@@ -308,8 +194,9 @@ export default function PaidStaff() {
           className="border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white text-black font-poppins focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
         >
           <option value="">Gender</option>
-          <option value="M">Male</option>
-          <option value="F">Female</option>
+          <option value="male">Male</option>
+          <option value="female">Female</option>
+          <option value="other">Other</option>
         </select>
 
         <select
@@ -329,7 +216,7 @@ export default function PaidStaff() {
       </div>
 
       <div className="bg-gray-100 rounded-2xl p-4 shadow-md">
-        <DataTable columns={columns} data={staff as unknown as Record<string, unknown>[]} />
+        <DataTable columns={columns} data={filteredStaff as unknown as Record<string, unknown>[]} />
       </div>
     </div>
   );
