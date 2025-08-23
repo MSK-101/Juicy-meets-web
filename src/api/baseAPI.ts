@@ -15,7 +15,24 @@ export const apiRequest = async (
   options: RequestInit = {}
 ): Promise<unknown> => {
   const user = useAuthStore.getState().user;
-  const token = user?.token;
+  let token = user?.token;
+
+  console.log('🔍 API Request Debug:', { endpoint, hasUserToken: !!user?.token, hasUser: !!user });
+
+  // If no token in auth store, try to get from localStorage
+  if (!token) {
+    try {
+      const storedToken = localStorage.getItem('juicyMeetsAuthToken');
+      if (storedToken) {
+        token = storedToken;
+        console.log('🔍 Retrieved token from localStorage');
+      }
+    } catch (error) {
+      console.warn('Could not access localStorage for token');
+    }
+  }
+
+  console.log('🔍 Final token for request:', token ? 'Present' : 'Missing');
 
   const config: RequestInit = {
     ...options,
@@ -27,11 +44,15 @@ export const apiRequest = async (
     },
   };
 
+  console.log('🔍 Request headers:', config.headers);
+
   try {
     const response = await fetch(`${BASE_URL}${endpoint}`, config);
     const contentType = response.headers.get("content-type");
     const isJSON = contentType?.includes("application/json");
     const data = isJSON ? await response.json() : await response.text();
+
+    console.log('🔍 Response status:', response.status, 'for endpoint:', endpoint);
 
     if (!response.ok) {
       useErrorStore.getState().setError(data?.message || data || "An error occurred");

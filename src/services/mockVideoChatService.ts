@@ -1,9 +1,8 @@
-// import { VideoMatchStatus } from './cleanVideoChatService';
+import { useAuthStore } from '../store/auth';
 
 export interface WebRTCSignalData {
   type: 'offer' | 'answer' | 'ice-candidate';
-  data: RTCSessionDescriptionInit | RTCIceCandidateInit;
-  room_id: string;
+  data: any;
   target_user_id: string;
 }
 
@@ -15,7 +14,7 @@ export class MockVideoChatService {
   private partnerId: string | null = null;
   private isInitiator: boolean = false;
   private iceCandidateQueue: RTCIceCandidateInit[] = [];
-  private userId: string;
+  private userId: string | null = null;
 
   // Simulation state
   private isWaiting = false;
@@ -27,21 +26,34 @@ export class MockVideoChatService {
   private onPartnerLeftCallback: (() => void) | null = null;
 
   constructor() {
-    this.userId = this.generateUserId();
+    this.userId = this.getAuthenticatedUserId();
     console.log('🎥 MockVideoChatService initialized with user ID:', this.userId);
   }
 
-  private generateUserId(): string {
+  private getAuthenticatedUserId(): string | null {
+    // Check if we're in the browser environment
     if (typeof window === 'undefined') {
-      return `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      return null;
     }
 
-    let userId = localStorage.getItem('video_chat_user_id');
-    if (!userId) {
-      userId = `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      localStorage.setItem('video_chat_user_id', userId);
+    // Get user ID from auth store
+    const user = useAuthStore.getState().user;
+    if (user?.id) {
+      return user.id.toString();
     }
-    return userId;
+
+    // Fallback to localStorage if auth store not hydrated yet
+    try {
+      const storedUser = localStorage.getItem('juicyMeetsUser');
+      if (storedUser) {
+        const userData = JSON.parse(storedUser);
+        return userData.id?.toString() || null;
+      }
+    } catch (error) {
+      console.warn('Could not parse stored user data');
+    }
+
+    return null;
   }
 
   // Event listeners

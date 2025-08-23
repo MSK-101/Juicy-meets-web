@@ -4,14 +4,19 @@ import { persist, createJSONStorage } from "zustand/middleware";
 export interface User {
   id: number;
   email: string;
+  age?: number;
+  gender?: 'male' | 'female' | 'other';
+  interested_in?: 'male' | 'female' | 'other';
   provider?: string;
   oauth_user: boolean;
   confirmed: boolean;
   confirmed_at?: string;
   profile_completed: boolean;
+  role: 'user' | 'staff' | 'admin';
+  user_status: 'pending' | 'active' | 'suspended';
+  coin_balance: number;
   created_at: string;
   updated_at: string;
-  role?: 'user' | 'admin';
   token?: string; // JWT token for API requests
 }
 

@@ -6,6 +6,7 @@ export interface ChatMessage {
   from: string;
   text: string;
   timestamp: number;
+  id?: string; // Optional unique identifier for duplicate detection
 }
 
 interface ChatMessageContainerProps {

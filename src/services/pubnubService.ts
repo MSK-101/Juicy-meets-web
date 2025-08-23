@@ -97,51 +97,49 @@ class PubNubService {
     }
   }
 
+  // Sanitize channel name for PubNub compatibility
+  private sanitizeChannelName(chatId: string): string {
+    // PubNub channel names must be:
+    // - 1-92 characters long
+    // - Only alphanumeric, hyphens, underscores, and periods
+    // - Cannot start with a number
+
+    let sanitized = chatId
+      .replace(/[^a-zA-Z0-9\-_\.]/g, '') // Remove invalid characters
+      .substring(0, 20); // Limit length to 20 chars
+
+    // Ensure it doesn't start with a number
+    if (/^\d/.test(sanitized)) {
+      sanitized = 'room-' + sanitized;
+    }
+
+    // Ensure it's not empty
+    if (!sanitized) {
+      sanitized = 'default-room';
+    }
+
+    return sanitized;
+  }
+
   async connect(userId: string, chatId: string): Promise<void> {
-    if (!this.isClient || !this.isInitialized || !this.pubnub) {
-      console.log('❌ PubNub not available on server side');
+    if (!this.pubnub) {
+      console.error('❌ PubNub not initialized');
       return;
-    }
-
-    // Prevent duplicate connections for the same user to the same chat
-    if (this.currentChatId === chatId && this.currentUser === userId) {
-      console.log('🔄 PubNub: Already connected to this chat with this user');
-      return;
-    }
-
-    // If connecting to a different chat or as a different user, allow it
-    if (this.currentChatId && this.currentChatId !== chatId) {
-      console.log('🔄 PubNub: Switching from chat', this.currentChatId, 'to', chatId);
-    }
-
-    if (this.currentUser && this.currentUser !== userId) {
-      console.log('🔄 PubNub: Switching from user', this.currentUser, 'to', userId);
     }
 
     try {
-      console.log('🔌 PubNub: Starting connection process...');
-      console.log('🔌 PubNub: Current state before connection:');
-      console.log('  - currentUser:', this.currentUser);
-      console.log('  - currentChatId:', this.currentChatId);
-      console.log('  - userId to connect:', userId);
-      console.log('  - chatId to connect:', chatId);
-
-      // Set the currentChatId FIRST before doing anything else
-      this.currentChatId = chatId;
       this.currentUser = userId;
+      this.currentChatId = chatId;
 
-      console.log('🔌 PubNub: Set currentUser and currentChatId');
-      console.log('  - currentUser:', this.currentUser);
-      console.log('  - currentChatId:', this.currentChatId);
+      console.log('🔌 PubNub: Connecting user', userId, 'to chat', chatId);
 
-      // Set UUID for this user
-      this.pubnub.setUUID(userId);
+      // Sanitize channel names for PubNub compatibility
+      const sanitizedChatId = this.sanitizeChannelName(chatId);
+      const chatChannel = `chat-${sanitizedChatId}`;
+      const presenceChannel = `presence-${sanitizedChatId}`;
 
-      // Subscribe to chat and presence channels
-      const chatChannel = `chat-${chatId}`;
-      const presenceChannel = `presence-${chatId}`;
-
-      console.log('📡 PubNub: Subscribing to channels:', [chatChannel, presenceChannel]);
+      console.log('📡 PubNub: Subscribing to sanitized channels:', [chatChannel, presenceChannel]);
+      console.log('📝 Original chatId:', chatId, '→ Sanitized:', sanitizedChatId);
 
       await this.pubnub.subscribe({
         channels: [chatChannel, presenceChannel],
@@ -393,54 +391,50 @@ class PubNubService {
     }
   }
 
-  // Send WebRTC signal via PubNub
-  sendWebRTCSignal(signal: WebRTCSignal) {
-    if (!this.isClient || !this.isInitialized || !this.pubnub || !this.currentChatId) {
-      console.log('PubNub not available for sending WebRTC signal');
+  // Send WebRTC signal to specific user in chat
+  async sendWebRTCSignal(signal: {
+    type: 'offer' | 'answer' | 'ice-candidate';
+    data: RTCSessionDescriptionInit | RTCIceCandidateInit;
+    from: string;
+    to: string;
+    chatId: string;
+  }): Promise<void> {
+    if (!this.pubnub || !this.currentChatId) {
+      console.error('❌ PubNub not available or not connected to chat');
       return;
     }
 
     try {
-      // Check if we're subscribed to the channel
-      const channel = this.getChatChannel(signal.chatId);
-      const subscribedChannels = this.pubnub.getSubscribedChannels();
+      // Use sanitized channel name
+      const sanitizedChatId = this.sanitizeChannelName(signal.chatId);
+      const chatChannel = `chat-${sanitizedChatId}`;
 
-      if (!subscribedChannels.includes(channel)) {
-        console.log('⚠️ Not subscribed to channel:', channel);
-        console.log('📡 Subscribed channels:', subscribedChannels);
-        return;
-      }
+      console.log(`📡 PubNub: Sending WebRTC ${signal.type} signal to channel:`, chatChannel);
+      console.log(`📤 Signal details:`, {
+        type: signal.type,
+        from: signal.from,
+        to: signal.to,
+        chatId: signal.chatId,
+        sanitizedChatId: sanitizedChatId
+      });
 
-      // Format message for WebRTC signaling
       const message = {
         type: signal.type,
         data: signal.data,
         from: signal.from,
-        chatId: signal.chatId
+        chatId: signal.chatId,
+        connectionId: `${signal.from}-${signal.to}-${Date.now()}`
       };
 
-      console.log('📤 PubNub: Sending WebRTC signal to channel:', channel);
-      console.log('📤 Message content:', message);
-      console.log('📤 Signal type:', signal.type);
-      console.log('📤 From user:', signal.from);
-
-      this.pubnub.publish({
-        channel: channel,
-        message: message,
-      }).then((result) => {
-        console.log('✅ PubNub WebRTC signal sent successfully:', result);
-        console.log('✅ Sent to channel:', channel);
-      }).catch((error) => {
-        console.error('❌ PubNub publish error:', error);
-        console.error('❌ Error details:', {
-          status: error.status,
-          message: error.message,
-          details: error.details
-        });
+      await this.pubnub.publish({
+        channel: chatChannel,
+        message: message
       });
 
+      console.log(`✅ WebRTC ${signal.type} signal sent successfully via PubNub`);
     } catch (error) {
-      console.error('💥 Error in sendWebRTCSignal:', error);
+      console.error(`❌ Failed to send WebRTC ${signal.type} signal:`, error);
+      throw error;
     }
   }
 
@@ -882,12 +876,16 @@ class PubNubService {
     }
   }
 
-  private getChatChannel(chatId: string): string {
-    return `chat-${chatId}`;
+  // Get sanitized chat channel name
+  getChatChannel(chatId: string): string {
+    const sanitizedChatId = this.sanitizeChannelName(chatId);
+    return `chat-${sanitizedChatId}`;
   }
 
-  private getPresenceChannel(chatId: string): string {
-    return `presence-${chatId}`;
+  // Get sanitized presence channel name
+  getPresenceChannel(chatId: string): string {
+    const sanitizedChatId = this.sanitizeChannelName(chatId);
+    return `presence-${sanitizedChatId}`;
   }
 
   // Check if running on client side
