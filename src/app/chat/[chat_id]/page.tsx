@@ -10,6 +10,7 @@ import MaleIcon from "../components/MaleIcon";
 import FemaleIcon from "../components/FemaleIcon";
 import { ChatMessage } from "@/components/ChatMessageContainer";
 import { userService } from "@/api/services/userService";
+import { coinDeductionService } from "@/services/coinDeductionService";
 
 // Use imported ChatMessage interface
 
@@ -64,10 +65,47 @@ export default function VideoChatPage() {
       setUserId(storedUser.id.toString());
       setCoinBalance(storedUser.coin_balance);
       setIsCheckingAuth(false);
-      console.log('✅ User authenticated:', storedUser.id);
-      console.log('💰 Loaded user coin balance:', storedUser.coin_balance);
+
+      // Initialize deduction rules
+      coinDeductionService.initializeDeductionRules().then(() => {
+        // Deduction rules are loaded but not displayed
+      }).catch(error => {
+        console.error('❌ Failed to initialize deduction rules:', error);
+      });
     }
   }, [isClient, router]);
+
+  // Listen for coin deduction events
+  useEffect(() => {
+    if (!isClient) return;
+
+    const handleCoinDeduction = (event: CustomEvent) => {
+      const result = event.detail;
+
+      // Update coin balance in frontend state
+      setCoinBalance(result.new_balance);
+
+      // Sync the new balance with localStorage
+      userService.updateUserCoinBalance(result.new_balance);
+
+      // Show notification for deduction
+      if (result.deducted > 0) {
+        // Deduction applied successfully - no notification needed
+      }
+    };
+
+    const handleCoinDeductionError = () => {
+      // Error occurred but no notification needed
+    };
+
+    window.addEventListener('coinDeductionApplied', handleCoinDeduction as EventListener);
+    window.addEventListener('coinDeductionError', handleCoinDeductionError as EventListener);
+
+    return () => {
+      window.removeEventListener('coinDeductionApplied', handleCoinDeduction as EventListener);
+      window.removeEventListener('coinDeductionError', handleCoinDeductionError as EventListener);
+    };
+  }, [isClient]);
 
   // Initialize clean video chat service
   const initializeVideoChat = useCallback(async () => {
@@ -80,6 +118,9 @@ export default function VideoChatPage() {
       setConnectionState('connecting');
       setError(null);
 
+      // Ensure deduction rules are loaded before starting video chat
+      await coinDeductionService.initializeDeductionRules();
+
       // Get authenticated user ID instead of generating random one
       const authenticatedUser = userService.getUserFromLocalStorage();
       if (!authenticatedUser?.id) {
@@ -88,15 +129,14 @@ export default function VideoChatPage() {
 
       const currentUserId = authenticatedUser.id.toString();
       setUserId(currentUserId);
-      console.log('🆔 Using authenticated user ID:', currentUserId);
-
-      console.log('🚀 Initializing clean video chat for page:', chatId);
 
       // Set up event listeners
       cleanVideoChatService.onRemoteStream((stream) => {
-        console.log('📺 Remote stream received on page');
         setRemoteStream(stream);
         setConnectionState('connected');
+
+        // Start tracking chat duration for coin deductions
+        coinDeductionService.startChatDurationTracking();
 
         // Add welcome message when connection is established
         const welcomeMessage: ChatMessage = {
@@ -111,16 +151,13 @@ export default function VideoChatPage() {
       try {
         const localVideoStream = cleanVideoChatService.getCurrentLocalStream();
         if (localVideoStream) {
-          console.log('📹 Setting local stream from service');
           setLocalStream(localVideoStream);
         } else {
-          console.log('⚠️ No local stream available yet, will wait for it');
           // Try to get it after a short delay
           setTimeout(async () => {
             try {
               const delayedStream = cleanVideoChatService.getCurrentLocalStream();
               if (delayedStream) {
-                console.log('📹 Setting delayed local stream');
                 setLocalStream(delayedStream);
               }
             } catch (error) {
@@ -133,7 +170,6 @@ export default function VideoChatPage() {
       }
 
       cleanVideoChatService.onConnectionStateChange((state) => {
-        console.log('🔗 Connection state changed on page:', state);
         if (state === 'connected') {
           setConnectionState('connected');
         } else if (state === 'failed' || state === 'disconnected') {
@@ -142,7 +178,6 @@ export default function VideoChatPage() {
       });
 
       cleanVideoChatService.onPartnerLeft(() => {
-        console.log('👋 Partner left on page');
         setRemoteStream(null);
         setConnectionState('disconnected');
         // Clear messages when partner leaves
@@ -151,12 +186,9 @@ export default function VideoChatPage() {
 
       // Set up message listener
       cleanVideoChatService.onMessageReceived((message) => {
-        console.log('💬 Message received on page:', message);
-
         // Additional safety check: ignore messages from ourselves that come via callback
         // This prevents seeing our own messages twice (once locally, once via PubNub)
         if (message.from === userId) {
-          console.log('🔄 Ignoring own message received via callback:', message.text);
           return;
         }
 
@@ -173,7 +205,6 @@ export default function VideoChatPage() {
         });
 
         if (isDuplicate) {
-          console.log('🔄 Ignoring duplicate message:', message.text);
           return;
         }
 
@@ -187,29 +218,25 @@ export default function VideoChatPage() {
       });
 
       // Join the video chat queue
-      await cleanVideoChatService.joinQueue();
-      setIsInitialized(true);
-      console.log('✅ Video chat initialized successfully');
+      try {
+        await cleanVideoChatService.joinQueue();
+        setIsInitialized(true);
+      } catch (error) {
+        console.error('❌ Failed to join video chat queue:', error);
+        setError('Failed to join video chat queue');
+        setIsConnecting(false);
+        return;
+      }
 
-      // Get local stream immediately after initialization
-      setTimeout(async () => {
-        try {
-          const currentLocalStream = cleanVideoChatService.getCurrentLocalStream();
-          if (currentLocalStream) {
-            console.log('📹 Setting local stream after initialization');
-            setLocalStream(currentLocalStream);
-          } else {
-            console.log('⚠️ No local stream after initialization, trying to force refresh...');
-            const freshStream = await cleanVideoChatService.forceRefreshLocalStream();
-            if (freshStream) {
-              console.log('📹 Local stream refreshed after initialization');
-              setLocalStream(freshStream);
-            }
-          }
-        } catch (error) {
-          console.warn('⚠️ Could not get local stream after initialization:', error);
+      // Get local stream after joining queue
+      try {
+        const currentLocalStream = cleanVideoChatService.getCurrentLocalStream();
+        if (currentLocalStream) {
+          setLocalStream(currentLocalStream);
         }
-      }, 2000); // Wait 2 seconds for everything to be ready
+      } catch (error) {
+        console.warn('⚠️ Could not get local stream after joining queue:', error);
+      }
 
     } catch (err) {
       console.error('❌ Error initializing video chat:', err);
@@ -247,37 +274,47 @@ export default function VideoChatPage() {
     }
   }, [chatId, initializeVideoChat, isInitialized, isClient, isCheckingAuth]);
 
-  // Periodically check for local stream updates
+  // Periodic check for local stream
   useEffect(() => {
     if (!isClient || !isInitialized) return;
 
-    const checkLocalStream = () => {
-      try {
-        const currentLocalStream = cleanVideoChatService.getCurrentLocalStream();
-        if (currentLocalStream && currentLocalStream !== localStream) {
-          console.log('📹 Local stream updated');
-          setLocalStream(currentLocalStream);
+    const interval = setInterval(() => {
+      if (!localStream) {
+        try {
+          const currentLocalStream = cleanVideoChatService.getCurrentLocalStream();
+          if (currentLocalStream) {
+            setLocalStream(currentLocalStream);
+          }
+        } catch (error) {
+          console.warn('⚠️ Could not get local stream in periodic check:', error);
         }
-      } catch (error) {
-        console.warn('⚠️ Error checking local stream:', error);
       }
-    };
-
-    // Check immediately
-    checkLocalStream();
-
-    // Check every 2 seconds
-    const interval = setInterval(checkLocalStream, 2000);
+    }, 5000); // Check every 5 seconds
 
     return () => clearInterval(interval);
   }, [isClient, isInitialized, localStream]);
+
+  // Update chat duration in real-time
+  useEffect(() => {
+    if (!isClient || !isInitialized) return;
+
+    const durationInterval = setInterval(() => {
+      // Chat duration tracking is handled by coin deduction service
+      // but not displayed on the UI
+    }, 1000);
+
+    return () => clearInterval(durationInterval);
+  }, [isClient, isInitialized]);
 
   // Cleanup on unmount
   useEffect(() => {
     return () => {
       if (isInitialized) {
-        console.log('🧹 Cleaning up video chat on page unmount');
-        cleanVideoChatService.leaveChat();
+        // Stop coin deduction tracking
+        coinDeductionService.stopChatDurationTracking();
+
+        // Cleanup video chat service
+        cleanVideoChatService.cleanup();
       }
     };
   }, [isInitialized]);
@@ -306,7 +343,6 @@ export default function VideoChatPage() {
     try {
       // Send message via video chat service (which will send via PubNub)
       await cleanVideoChatService.sendMessage(input.trim());
-      console.log('✅ Message sent successfully via video chat service');
     } catch (error) {
       console.error('❌ Failed to send message:', error);
       // Optionally remove the message from local state if sending failed
@@ -349,13 +385,9 @@ export default function VideoChatPage() {
           <button
             onClick={async () => {
               try {
-                console.log('📹 Manually refreshing local stream...');
                 const freshStream = await cleanVideoChatService.forceRefreshLocalStream();
                 if (freshStream) {
-                  console.log('📹 Local stream refreshed successfully');
                   setLocalStream(freshStream);
-                } else {
-                  console.log('⚠️ Could not refresh local stream');
                 }
               } catch (error) {
                 console.warn('⚠️ Error refreshing local stream:', error);
@@ -368,6 +400,7 @@ export default function VideoChatPage() {
         </div>
       )}
 
+      {/* Main video chat interface */}
       <div className="w-full h-full flex flex-col md:flex-row items-stretch justify-stretch p-0">
         <div className="gradient-border border md:border-[3px] w-full h-full flex flex-col md:flex-row overflow-hidden relative">
           {/* Left/User 1 - Remote User */}

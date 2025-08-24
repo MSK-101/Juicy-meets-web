@@ -137,6 +137,21 @@ export class UserService {
     localStorage.removeItem('juicyMeetsUserDetails'); // Also clear old user details
   }
 
+  // Update user's coin balance in localStorage
+  updateUserCoinBalance(newBalance: number): void {
+    try {
+      const userString = localStorage.getItem('juicyMeetsUser');
+      if (userString) {
+        const user = JSON.parse(userString);
+        user.coin_balance = newBalance;
+        localStorage.setItem('juicyMeetsUser', JSON.stringify(user));
+        console.log('💰 Updated user coin balance in localStorage:', newBalance);
+      }
+    } catch (error) {
+      console.error('❌ Error updating user coin balance in localStorage:', error);
+    }
+  }
+
   // Get user details from localStorage (legacy support)
   getUserDetailsFromLocalStorage(): { email: string; age: string; gender: string; interest: string } | null {
     try {
