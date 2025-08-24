@@ -22,37 +22,84 @@ const inputClass =
 export default function ChatInput({ messages, input, setInput, handleSend, chatEndRef }: ChatInputProps) {
   const [showMessages, setShowMessages] = useState(true);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const lastMessageTimeRef = useRef<number>(0);
 
-  // Helper: get last message timestamp
-  const lastMessageTime = messages.length > 0 ? messages[messages.length - 1].timestamp || 0 : 0;
-
-  // Hide timer logic: only start if input is empty and last message is older than 15s
+  // Update last message time ref when messages change
   useEffect(() => {
+    if (messages.length > 0) {
+      const lastMessage = messages[messages.length - 1];
+      if (lastMessage.timestamp) {
+        lastMessageTimeRef.current = lastMessage.timestamp;
+      }
+    }
+  }, [messages]);
+
+  // Hide timer logic: hide messages container after 20s of inactivity
+  useEffect(() => {
+    // Clear any existing timer
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+    }
+
     if (input.trim() !== "") {
+      // If user is typing, show messages
       setShowMessages(true);
-      if (timerRef.current) clearTimeout(timerRef.current);
       return;
     }
-    const now = Date.now();
-    if (now - lastMessageTime < 15000) {
-      setShowMessages(true);
-      if (timerRef.current) clearTimeout(timerRef.current);
-      return;
-    }
-    // Start or reset the 15s timer
-    if (timerRef.current) clearTimeout(timerRef.current);
-    timerRef.current = setTimeout(() => {
+
+    // If no messages, don't show container
+    if (messages.length === 0) {
       setShowMessages(false);
-    }, 15000);
+      return;
+    }
+
+    const now = Date.now();
+    const timeSinceLastMessage = now - lastMessageTimeRef.current;
+
+    if (timeSinceLastMessage >= 20000) {
+      // If last message was more than 20s ago, hide immediately
+      setShowMessages(false);
+    } else {
+      // Show messages and set timer to hide after remaining time
+      setShowMessages(true);
+      const remainingTime = 20000 - timeSinceLastMessage;
+
+      timerRef.current = setTimeout(() => {
+        setShowMessages(false);
+      }, remainingTime);
+    }
+
     return () => {
-      if (timerRef.current) clearTimeout(timerRef.current);
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+      }
     };
-  }, [input, lastMessageTime]);
+  }, [input, messages.length]); // Only depend on input and messages length, not timestamp
 
   // On input focus, show messages and reset timer
   const handleFocus = () => {
     setShowMessages(true);
-    if (timerRef.current) clearTimeout(timerRef.current);
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+  };
+
+  // On input blur, start the hide timer if no input
+  const handleBlur = () => {
+    if (input.trim() === "" && messages.length > 0) {
+      const now = Date.now();
+      const timeSinceLastMessage = now - lastMessageTimeRef.current;
+
+      if (timeSinceLastMessage < 20000) {
+        const remainingTime = 20000 - timeSinceLastMessage;
+        timerRef.current = setTimeout(() => {
+          setShowMessages(false);
+        }, remainingTime);
+      } else {
+        setShowMessages(false);
+      }
+    }
   };
 
   // Determine form class based on messages and showMessages
@@ -82,6 +129,7 @@ export default function ChatInput({ messages, input, setInput, handleSend, chatE
             onChange={e => setInput(e.target.value)}
             maxLength={200}
             onFocus={handleFocus}
+            onBlur={handleBlur}
           />
           <button
             type="submit"
@@ -91,13 +139,18 @@ export default function ChatInput({ messages, input, setInput, handleSend, chatE
             ➤
           </button>
         </div>
-        {/* Messages container with fade/slide animation and scroll */}
+        {/* Messages container with fixed height, scroll, and fade/slide animation */}
         {messages.length > 0 && (
-          console.log(messages),
           <div
             className={`flex flex-col gap-1 transition-all duration-500 ease-in-out ${
-              showMessages ? 'opacity-100 max-h-[180px] overflow-y-scroll translate-y-0' : 'opacity-0 max-h-0 overflow-hidden -translate-y-4 pointer-events-none'
+              showMessages
+                ? 'opacity-100 max-h-[180px] overflow-y-auto translate-y-0'
+                : 'opacity-0 max-h-0 overflow-hidden -translate-y-4 pointer-events-none'
             }`}
+            style={{
+              height: showMessages ? '180px' : '0px',
+              overflowY: showMessages ? 'auto' : 'hidden'
+            }}
           >
             {messages.map((msg, idx) => (
               <div

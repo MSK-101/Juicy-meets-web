@@ -99,9 +99,6 @@ export default function Home() {
               <span className="text-white text-sm hidden md:block">
                 {user.email}
               </span>
-              <span className="text-yellow-400 text-sm hidden md:block">
-                💰 {user.coin_balance} coins
-              </span>
               <button
                 className="bg-linear-180 from-[#420099] to-[#9747FF] cursor-pointer px-5 py-2 rounded-full"
                 onClick={() => {
