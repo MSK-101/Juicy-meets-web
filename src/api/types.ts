@@ -52,6 +52,7 @@ export interface Sequence {
   active: boolean;
   video_count: number;
   videos_count: number;
+  content_type: string[];
   created_at: string;
   updated_at: string;
   pool?: Pool;
@@ -76,12 +77,14 @@ export interface CreateSequenceRequest {
   pool_id: number;
   active?: boolean;
   video_count?: number;
+  content_type?: string[];
 }
 
 export interface UpdateSequenceRequest {
   name?: string;
   active?: boolean;
   video_count?: number;
+  content_type?: string[];
 }
 
 export interface ReorderSequencesRequest {

@@ -29,14 +29,43 @@ export const SplitVideoChat: React.FC<SplitVideoChatProps> = ({
   // Handle local video stream
   useEffect(() => {
     if (localStream && localVideoRef.current) {
-      localVideoRef.current.srcObject = localStream;
+      try {
+        localVideoRef.current.srcObject = localStream;
+        // Force video element to load
+        localVideoRef.current.load();
+
+        // Ensure video plays
+        localVideoRef.current.play().then(() => {
+          console.log('✅ Local video started playing successfully');
+        }).catch(error => {
+          console.warn('⚠️ Could not autoplay local video:', error);
+        });
+
+      } catch (error) {
+        console.error('❌ Error setting local stream on video element:', error);
+      }
+    } else if (localStream) {
+      // Wait a bit and try again
+      setTimeout(() => {
+        if (localStream && localVideoRef.current) {
+          console.log('🔄 Retrying to set local stream after delay...');
+          try {
+            localVideoRef.current.srcObject = localStream;
+            localVideoRef.current.load();
+            localVideoRef.current.play().catch(console.warn);
+            console.log('✅ Local stream set on retry');
+          } catch (error) {
+            console.error('❌ Error on retry:', error);
+          }
+        }
+      }, 100);
+    } else {
+      console.log('⚠️ No local stream available');
     }
   }, [localStream]);
 
   // Handle remote video stream
   useEffect(() => {
-    console.log('🔄 Remote stream effect triggered:', !!remoteStream, !!remoteVideoRef.current);
-
     if (!remoteStream) {
       console.log('⚠️ No remote stream available');
       setHasRemoteStream(false);
@@ -47,10 +76,25 @@ export const SplitVideoChat: React.FC<SplitVideoChatProps> = ({
       if (remoteVideoRef.current) {
         console.log('📺 Setting remote stream on video element');
         console.log('📺 Remote stream tracks:', remoteStream.getTracks().length);
-        remoteVideoRef.current.srcObject = remoteStream;
-        setHasRemoteStream(true);
-        console.log('✅ Remote video element srcObject set');
-        return true;
+
+        try {
+          remoteVideoRef.current.srcObject = remoteStream;
+          // Force video element to load
+          remoteVideoRef.current.load();
+
+          // Ensure video plays
+          remoteVideoRef.current.play().then(() => {
+            console.log('✅ Remote video started playing successfully');
+          }).catch(error => {
+            console.warn('⚠️ Could not autoplay remote video:', error);
+          });
+
+          setHasRemoteStream(true);
+          return true;
+        } catch (error) {
+          console.error('❌ Error setting remote stream on video element:', error);
+          return false;
+        }
       }
       return false;
     };
@@ -61,7 +105,6 @@ export const SplitVideoChat: React.FC<SplitVideoChatProps> = ({
     }
 
     // If video ref not ready, wait a bit and retry
-    console.log('⏳ Video ref not ready, retrying in 100ms...');
     const retryTimeout = setTimeout(() => {
       if (assignStream()) {
         console.log('✅ Remote stream assigned on retry');
@@ -109,14 +152,16 @@ export const SplitVideoChat: React.FC<SplitVideoChatProps> = ({
   // Show remote video on left side
   if (showRemote) {
     return (
-      <div className="w-full h-full relative bg-gray-900">
+      <div className="w-full h-full relative bg-gray-900 border-2 border-red-500">
         {hasRemoteStream && remoteStream ? (
-          <video
-            ref={remoteVideoRef}
-            autoPlay
-            playsInline
-            className="w-full h-full object-cover"
-          />
+          <div className="w-full h-full relative">
+            <video
+              ref={remoteVideoRef}
+              autoPlay
+              playsInline
+              className="w-full h-full object-cover"
+            />
+          </div>
         ) : (
           <div className="w-full h-full flex items-center justify-center bg-gray-800">
             {connectionState === 'connecting' || isConnecting ? (
@@ -141,15 +186,17 @@ export const SplitVideoChat: React.FC<SplitVideoChatProps> = ({
 
   // Show local video on right side
   return (
-    <div className="w-full h-full relative bg-gray-900">
+    <div className="w-full h-full relative bg-gray-900 border-2 border-blue-500">
       {localStream ? (
-        <video
-          ref={localVideoRef}
-          autoPlay
-          playsInline
-          muted
-          className="w-full h-full object-cover"
-        />
+        <div className="w-full h-full relative">
+          <video
+            ref={localVideoRef}
+            autoPlay
+            playsInline
+            muted
+            className="w-full h-full object-cover"
+          />
+        </div>
       ) : (
         <div className="w-full h-full flex items-center justify-center bg-gray-800">
           {connectionState === 'connecting' || isConnecting ? (
@@ -158,7 +205,10 @@ export const SplitVideoChat: React.FC<SplitVideoChatProps> = ({
               <p className="text-white">Initializing camera...</p>
             </div>
           ) : (
-            <p className="text-gray-400">Camera not available</p>
+            <div className="text-center">
+              <p className="text-gray-400">Camera not available</p>
+              <p className="text-gray-500 text-sm mt-2">Stream: {localStream ? 'Present' : 'Missing'}</p>
+            </div>
           )}
         </div>
       )}

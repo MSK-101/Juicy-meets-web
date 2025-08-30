@@ -2,6 +2,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { cleanVideoChatService } from '@/services/cleanVideoChatService';
+import { nextSwipe } from '@/utils/swipeUtils';
 
 export const CleanVideoChat: React.FC = () => {
   const [status, setStatus] = useState<'idle' | 'joining' | 'waiting' | 'connected' | 'error'>('idle');
@@ -22,6 +23,20 @@ export const CleanVideoChat: React.FC = () => {
 
     cleanVideoChatService.onConnectionStateChange((state) => {
       console.log('🔗 Connection state changed:', state);
+      if (state === 'disconnected') {
+        //trigger swipe to next
+        (async () => {
+          await nextSwipe(
+            setConnectionState,
+            setError,
+            () => {}, // setIsVideoPlaying - not needed in this component
+            () => {}, // setCurrentVideoId - not needed in this component
+            () => {}, // setCurrentVideoUrl - not needed in this component
+            () => {}, // setCurrentVideoName - not needed in this component
+            () => {}  // setMessages - not needed in this component
+          );
+        })();
+      }
       setConnectionState(state);
 
       if (state === 'connected') {
@@ -164,7 +179,7 @@ export const CleanVideoChat: React.FC = () => {
             playsInline
             className="w-full h-full object-cover"
           />
-          {!cleanVideoChatService.getRemoteStream() && (
+          {!remoteVideoRef.current?.srcObject && (
             <div className="absolute inset-0 flex items-center justify-center bg-gray-800">
               <p className="text-gray-400">Waiting for partner...</p>
             </div>

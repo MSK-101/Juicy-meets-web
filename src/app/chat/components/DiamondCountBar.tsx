@@ -12,7 +12,7 @@ export default function DiamondCountBar({ count }: { count: number }) {
         width={32}
       />
       <span className="font-bold text-white text-sm md:text-[17px] leading-none">
-        {count.toLocaleString()}
+        {count?.toLocaleString() || 0}
       </span>
     </div>
   );

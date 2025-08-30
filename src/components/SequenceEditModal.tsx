@@ -9,7 +9,7 @@ interface SequenceEditModalProps {
   isOpen: boolean;
   onClose: () => void;
   sequence?: Sequence | null;
-  onSave: (data: { name: string; active: boolean; video_count: number }) => void;
+  onSave: (data: { name: string; active: boolean; video_count: number; content_type: string[] }) => void;
   isLoading?: boolean;
   mode: "create" | "edit";
 }
@@ -25,9 +25,16 @@ export default function SequenceEditModal({
   const [formData, setFormData] = useState({
     name: "",
     active: true,
-    video_count: 0
+    video_count: 0,
+    content_type: [] as string[]
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const contentTypeOptions = [
+    { value: "recorded_videos", label: "Recorded Videos" },
+    { value: "app_users", label: "App Users" },
+    { value: "staff", label: "Staff" }
+  ];
 
   // Initialize form data when sequence changes
   useEffect(() => {
@@ -35,13 +42,15 @@ export default function SequenceEditModal({
       setFormData({
         name: sequence.name || "",
         active: sequence.active,
-        video_count: sequence.video_count
+        video_count: sequence.video_count,
+        content_type: sequence.content_type || []
       });
     } else if (mode === "create") {
       setFormData({
         name: "",
         active: true,
-        video_count: 0
+        video_count: 0,
+        content_type: ["recorded_videos"] // Default to recorded videos for new sequences
       });
     }
     setErrors({});
@@ -63,6 +72,23 @@ export default function SequenceEditModal({
     }
   };
 
+  const handleContentTypeChange = (contentType: string) => {
+    setFormData(prev => ({
+      ...prev,
+      content_type: prev.content_type.includes(contentType)
+        ? prev.content_type.filter(type => type !== contentType)
+        : [...prev.content_type, contentType]
+    }));
+
+    // Clear error when field is updated
+    if (errors.content_type) {
+      setErrors(prev => ({
+        ...prev,
+        content_type: ""
+      }));
+    }
+  };
+
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
 
@@ -72,6 +98,10 @@ export default function SequenceEditModal({
 
     if (formData.video_count < 0) {
       newErrors.video_count = "Video count must be 0 or greater";
+    }
+
+    if (formData.content_type.length === 0) {
+      newErrors.content_type = "At least one content type must be selected";
     }
 
     setErrors(newErrors);
@@ -88,7 +118,8 @@ export default function SequenceEditModal({
     onSave({
       name: formData.name.trim(),
       active: formData.active,
-      video_count: formData.video_count
+      video_count: formData.video_count,
+      content_type: formData.content_type
     });
   };
 
@@ -159,6 +190,30 @@ export default function SequenceEditModal({
             )}
             {errors.video_count && (
               <p className="text-sm text-red-600 font-poppins">{errors.video_count}</p>
+            )}
+          </div>
+
+          {/* Content Type */}
+          <div className="space-y-2">
+            <label className="block text-sm font-medium text-gray-700 font-poppins">
+              Content Type
+            </label>
+            <div className="space-y-2">
+              {contentTypeOptions.map((option) => (
+                <label key={option.value} className="flex items-center space-x-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    value={option.value}
+                    checked={formData.content_type.includes(option.value)}
+                    onChange={() => handleContentTypeChange(option.value)}
+                    className="w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
+                  />
+                  <span className="text-sm text-gray-700 font-poppins">{option.label}</span>
+                </label>
+              ))}
+            </div>
+            {errors.content_type && (
+              <p className="text-sm text-red-600 font-poppins">{errors.content_type}</p>
             )}
           </div>
 

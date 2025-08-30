@@ -112,8 +112,9 @@ export class UserService {
   // Get user from localStorage
   getUserFromLocalStorage(): User | null {
     try {
-      const userString = localStorage.getItem('juicyMeetsUser');
-      return userString ? JSON.parse(userString) : null;
+      const userString = localStorage.getItem('juicy-meets-auth-storage');
+      const userstring = userString ? JSON.parse(userString) : null;
+      return userstring && userstring.state.user;
     } catch (error) {
       console.error('❌ Error getting user from localStorage:', error);
       return null;

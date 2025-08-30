@@ -9,8 +9,10 @@ import FlagButton from "../components/FlagButton";
 import MaleIcon from "../components/MaleIcon";
 import FemaleIcon from "../components/FemaleIcon";
 import { ChatMessage } from "@/components/ChatMessageContainer";
+import { VideoPlayer } from "@/components/VideoPlayer";
 import { userService } from "@/api/services/userService";
 import { coinDeductionService } from "@/services/coinDeductionService";
+import { nextSwipe } from "@/utils/swipeUtils";
 
 // Use imported ChatMessage interface
 
@@ -36,6 +38,16 @@ export default function VideoChatPage() {
   const [coinBalance, setCoinBalance] = useState<number>(0);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
 
+  // Touch gesture state for mobile swipe
+  const [touchStart, setTouchStart] = useState<{ x: number; y: number } | null>(null);
+  const [touchEnd, setTouchEnd] = useState<{ x: number; y: number } | null>(null);
+
+  // Video display state
+  const [isVideoPlaying, setIsVideoPlaying] = useState(false);
+  const [currentVideoId, setCurrentVideoId] = useState<string | null>(null);
+  const [currentVideoUrl, setCurrentVideoUrl] = useState<string | null>(null);
+  const [currentVideoName, setCurrentVideoName] = useState<string | null>(null);
+
   // Convert ChatMessage to format expected by ChatInput
   const messagesForChatInput = React.useMemo(() => {
     if (!userId) return [];
@@ -51,16 +63,75 @@ export default function VideoChatPage() {
     setIsClient(true);
   }, []);
 
+    // Touch gesture handlers for mobile swipe
+  const handleTouchStart = (e: React.TouchEvent) => {
+    setTouchStart({
+      x: e.targetTouches[0].clientX,
+      y: e.targetTouches[0].clientY
+    });
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    setTouchEnd({
+      x: e.targetTouches[0].clientX,
+      y: e.targetTouches[0].clientY
+    });
+  };
+
+  const handleTouchEnd = async () => {
+    if (!touchStart || !touchEnd) return;
+
+    const distanceX = touchStart.x - touchEnd.x;
+    const distanceY = touchStart.y - touchEnd.y;
+    const isHorizontalSwipe = Math.abs(distanceX) > Math.abs(distanceY);
+    const isLeftSwipe = distanceX > 50; // Minimum swipe distance
+
+    if (isHorizontalSwipe && isLeftSwipe) {
+      // Left swipe detected - trigger next match
+      await handleSwipeToNext();
+    }
+
+    // Reset touch state
+    setTouchStart(null);
+    setTouchEnd(null);
+  };
+
+  // Centralized swipe handler for both touch and button
+  const handleSwipeToNext = async () => {
+    await nextSwipe(
+      setConnectionState,
+      setError,
+      setIsVideoPlaying,
+      setCurrentVideoId,
+      setCurrentVideoUrl,
+      setCurrentVideoName,
+      setMessages
+    );
+  };
+
+  // Handle video end
+  const handleVideoEnd = () => {
+    setIsVideoPlaying(false);
+    setCurrentVideoId(null);
+    setCurrentVideoUrl(null);
+    setCurrentVideoName(null);
+    setConnectionState('disconnected');
+    setMessages([]); // Clear messages when video ends
+
+    // Stop tracking chat duration for coin deductions
+    coinDeductionService.stopChatDurationTracking();
+
+    // User can swipe again for next match
+  };
+
   // Check authentication and redirect if no user
   useEffect(() => {
     if (isClient) {
       const storedUser = userService.getUserFromLocalStorage();
       if (!storedUser) {
-        console.log('❌ No authenticated user found, redirecting to homepage');
         router.push('/');
         return;
       }
-
       // User is authenticated, set user ID and coin balance
       setUserId(storedUser.id.toString());
       setCoinBalance(storedUser.coin_balance);
@@ -69,8 +140,8 @@ export default function VideoChatPage() {
       // Initialize deduction rules
       coinDeductionService.initializeDeductionRules().then(() => {
         // Deduction rules are loaded but not displayed
-      }).catch(error => {
-        console.error('❌ Failed to initialize deduction rules:', error);
+      }).catch(() => {
+        // Silent error handling
       });
     }
   }, [isClient, router]);
@@ -112,7 +183,6 @@ export default function VideoChatPage() {
     if (!isClient || isInitialized || isConnecting) {
       return;
     }
-
     try {
       setIsConnecting(true);
       setConnectionState('connecting');
@@ -134,17 +204,26 @@ export default function VideoChatPage() {
       cleanVideoChatService.onRemoteStream((stream) => {
         setRemoteStream(stream);
         setConnectionState('connected');
+        // NOTE: Don't clear video state here as it might interfere with video matches
+        // The video state will be managed separately by the video match handler
 
         // Start tracking chat duration for coin deductions
         coinDeductionService.startChatDurationTracking();
+      });
 
-        // Add welcome message when connection is established
-        const welcomeMessage: ChatMessage = {
-          from: 'system',
-          text: '🎉 Video chat connected! You can now send messages.',
-          timestamp: Date.now()
-        };
-        setMessages(prev => [...prev, welcomeMessage]);
+      // Set up video match event listener
+      cleanVideoChatService.onVideoMatch((videoData) => {
+        console.log('🎥 Video match event triggered:', videoData);
+        setConnectionState('connected');
+        setError(null);
+        // NOTE: Don't clear remoteStream here as it affects both panels
+        setIsVideoPlaying(true);
+        setCurrentVideoId(videoData.videoId);
+        setCurrentVideoUrl(videoData.videoUrl);
+        setCurrentVideoName(videoData.videoName);
+
+        // Start new tracking for video
+        coinDeductionService.startChatDurationTracking();
       });
 
       // Get local stream from video chat service
@@ -160,13 +239,13 @@ export default function VideoChatPage() {
               if (delayedStream) {
                 setLocalStream(delayedStream);
               }
-            } catch (error) {
-              console.warn('⚠️ Could not get delayed local stream:', error);
+            } catch {
+              // Silent error handling
             }
           }, 1000);
         }
-      } catch (error) {
-        console.warn('⚠️ Could not get local stream:', error);
+      } catch {
+        // Silent error handling
       }
 
       cleanVideoChatService.onConnectionStateChange((state) => {
@@ -180,8 +259,15 @@ export default function VideoChatPage() {
       cleanVideoChatService.onPartnerLeft(() => {
         setRemoteStream(null);
         setConnectionState('disconnected');
+        setIsVideoPlaying(false);
+        setCurrentVideoId(null);
+        setCurrentVideoUrl(null);
+        setCurrentVideoName(null);
         // Clear messages when partner leaves
         setMessages([]);
+
+        // Stop tracking chat duration
+        coinDeductionService.stopChatDurationTracking();
       });
 
       // Set up message listener
@@ -221,8 +307,7 @@ export default function VideoChatPage() {
       try {
         await cleanVideoChatService.joinQueue();
         setIsInitialized(true);
-      } catch (error) {
-        console.error('❌ Failed to join video chat queue:', error);
+      } catch {
         setError('Failed to join video chat queue');
         setIsConnecting(false);
         return;
@@ -234,13 +319,11 @@ export default function VideoChatPage() {
         if (currentLocalStream) {
           setLocalStream(currentLocalStream);
         }
-      } catch (error) {
-        console.warn('⚠️ Could not get local stream after joining queue:', error);
+      } catch {
+        // Silent error handling
       }
 
     } catch (err) {
-      console.error('❌ Error initializing video chat:', err);
-
       let errorMessage = 'Failed to initialize video chat';
 
       if (err instanceof Error) {
@@ -261,6 +344,14 @@ export default function VideoChatPage() {
       setIsConnecting(false);
     }
   }, [chatId, isInitialized, isConnecting, isClient]);
+
+  // Cleanup effect to stop tracking when component unmounts
+  useEffect(() => {
+    return () => {
+      // Stop tracking chat duration when component unmounts
+      coinDeductionService.stopChatDurationTracking();
+    };
+  }, []);
 
   // Initialize on client side
   useEffect(() => {
@@ -285,8 +376,8 @@ export default function VideoChatPage() {
           if (currentLocalStream) {
             setLocalStream(currentLocalStream);
           }
-        } catch (error) {
-          console.warn('⚠️ Could not get local stream in periodic check:', error);
+        } catch {
+          // Silent error handling
         }
       }
     }, 5000); // Check every 5 seconds
@@ -326,28 +417,86 @@ export default function VideoChatPage() {
 
   const handleSend = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    if (!input.trim()) return;
+    if (!input.trim() || !userId) return;
 
-    const messageId = `${Date.now()}-${Math.random()}`;
-    const newMessage: ChatMessage = {
-      from: userId || 'unknown',
+    const timestamp = Date.now();
+    const messageId = `msg_${timestamp}_${Math.random().toString(36).substr(2, 9)}`;
+
+    // Create user message
+    const userMessage: ChatMessage = {
+      from: userId,
       text: input.trim(),
-      timestamp: Date.now(),
-      id: messageId, // Add unique ID for duplicate detection
+      timestamp: timestamp,
+      id: messageId
     };
 
-    // Add message locally immediately
-    setMessages((prev) => [...prev, newMessage]);
-    setInput("");
+    // Add user message to chat
+    setMessages(prev => [...prev, userMessage]);
 
-    try {
-      // Send message via video chat service (which will send via PubNub)
-      await cleanVideoChatService.sendMessage(input.trim());
-    } catch (error) {
-      console.error('❌ Failed to send message:', error);
-      // Optionally remove the message from local state if sending failed
-      setMessages((prev) => prev.filter(msg => msg.id !== messageId));
+    // If matched with video, create a dummy response to simulate conversation
+    if (isVideoPlaying && currentVideoId) {
+      // Simulate a response after a short delay
+      setTimeout(() => {
+        const dummyResponses = [
+          "That's interesting! Tell me more.",
+          "I see what you mean.",
+          "That's a great point!",
+          "I'm listening...",
+          "That's fascinating!",
+          "I understand what you're saying.",
+          "That makes sense to me.",
+          "I'm here for you.",
+          "That's really thoughtful.",
+          "I appreciate you sharing that.",
+          "That's a good perspective.",
+          "I can relate to that.",
+          "That's worth thinking about.",
+          "You have a way with words.",
+          "That's quite insightful.",
+          "I'm glad you shared that.",
+          "That's a beautiful thought.",
+          "You're absolutely right.",
+          "That's very considerate of you.",
+          "I love how you think."
+        ];
+
+        const followUpQuestions = [
+          "What made you think of that?",
+          "How do you feel about it?",
+          "What's your take on this?",
+          "How does that relate to your life?",
+          "What do you think happens next?",
+          "How would you handle that situation?",
+          "What's your experience with this?",
+          "How do you see this playing out?",
+          "What's your perspective on this?",
+          "How does this affect you?"
+        ];
+
+        // 30% chance to ask a follow-up question
+        const shouldAskQuestion = Math.random() < 0.3;
+        const responsePool = shouldAskQuestion ? followUpQuestions : dummyResponses;
+        const randomResponse = responsePool[Math.floor(Math.random() * responsePool.length)];
+
+        const dummyMessage: ChatMessage = {
+          from: 'video-partner',
+          text: randomResponse,
+          timestamp: Date.now(),
+          id: `dummy_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+        };
+
+        setMessages(prev => [...prev, dummyMessage]);
+      }, 1000 + Math.random() * 2000); // Random delay between 1-3 seconds
+    } else {
+      // For real user matches, send via PubNub
+      try {
+        await cleanVideoChatService.sendMessage(input.trim());
+      } catch {
+        // Silent error handling
+      }
     }
+
+    setInput("");
   };
 
   return (
@@ -379,42 +528,45 @@ export default function VideoChatPage() {
         </div>
       )}
 
-      {/* Local Stream Refresh Button */}
-      {!localStream && isInitialized && !error && (
-        <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-50">
-          <button
-            onClick={async () => {
-              try {
-                const freshStream = await cleanVideoChatService.forceRefreshLocalStream();
-                if (freshStream) {
-                  setLocalStream(freshStream);
-                }
-              } catch (error) {
-                console.warn('⚠️ Error refreshing local stream:', error);
-              }
-            }}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg shadow-lg"
-          >
-            📹 Refresh Camera
-          </button>
-        </div>
-      )}
-
       {/* Main video chat interface */}
       <div className="w-full h-full flex flex-col md:flex-row items-stretch justify-stretch p-0">
-        <div className="gradient-border border md:border-[3px] w-full h-full flex flex-col md:flex-row overflow-hidden relative">
-          {/* Left/User 1 - Remote User */}
+        <div
+          className="gradient-border border md:border-[3px] w-full h-full flex flex-col md:flex-row overflow-hidden relative"
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+        >
+          {/* Left/User 1 - Remote User or Video */}
           <div className="h-[60%] md:flex-1 flex flex-col relative overflow-hidden md:h-full">
             <div className="w-full h-full">
-              <SplitVideoChat
-                chatId={chatId}
-                showRemote={true}
-                localStream={null}
-                remoteStream={remoteStream}
-                connectionState={connectionState}
-                isConnecting={isConnecting}
-                error={error}
-              />
+              {isVideoPlaying && currentVideoId ? (
+                <VideoPlayer
+                  videoId={currentVideoId}
+                  videoUrl={currentVideoUrl || undefined}
+                  videoName={currentVideoName || undefined}
+                  onVideoEnd={handleVideoEnd}
+                />
+              ) : (
+                <SplitVideoChat
+                  chatId={chatId}
+                  showRemote={true}
+                  localStream={null}
+                  remoteStream={remoteStream}
+                  connectionState={connectionState}
+                  isConnecting={isConnecting}
+                  error={error}
+                />
+              )}
+
+              {/* Loading overlay when swiping */}
+              {connectionState === 'connecting' && (
+                <div className="absolute inset-0 bg-black/80 flex items-center justify-center z-20">
+                  <div className="text-center text-white">
+                    <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-white mx-auto mb-4"></div>
+                    <p className="text-lg">Finding your next match...</p>
+                  </div>
+                </div>
+              )}
             </div>
             {/* Project logo (top left, only left panel) */}
             <div className="absolute top-4 left-4 z-10">
@@ -468,7 +620,10 @@ export default function VideoChatPage() {
 
           {/* Swipe icon (desktop only, bottom center) */}
           <div className="hidden md:flex absolute left-1/5 bottom-10 z-20">
-            <button>
+                        <button
+              onClick={handleSwipeToNext}
+              className="hover:scale-110 transition-transform duration-200"
+            >
               <img src="/swipe.png" alt="Swipe" className="w-33 h-33 mx-auto" />
             </button>
           </div>

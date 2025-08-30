@@ -31,7 +31,6 @@ export default function Home() {
     // Check if user is logged in or has data in localStorage
     const storedUser = userService.getUserFromLocalStorage();
     const storedUserDetails = userService.getUserDetailsFromLocalStorage();
-
     if (user) {
       // User is logged in via auth store, go straight to chat
       startChat();

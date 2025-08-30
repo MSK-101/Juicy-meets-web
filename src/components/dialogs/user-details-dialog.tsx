@@ -287,7 +287,7 @@ export default function UserDetailsDialog({
                 disabled={!isFormValid || isLoading}
                 style={{ opacity: (isFormValid && !isLoading) ? 1 : 0.5 }}
               >
-                {isLoading ? "Creating Account..." : "Continue Free"}
+                {isLoading ? "Submitting..." : "Continue Free"}
               </button>
 
               <button
@@ -296,7 +296,7 @@ export default function UserDetailsDialog({
                 disabled={!isFormValid || isLoading}
                 style={{ opacity: (isFormValid && !isLoading) ? 1 : 0.5 }}
               >
-                {isLoading ? "Creating Account..." : "Premium Trial 👑"}
+                {isLoading ? "Submitting..." : "Premium Trial 👑"}
               </button>
 
               {/* Show close button only when form is complete */}

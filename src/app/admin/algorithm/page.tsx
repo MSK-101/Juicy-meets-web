@@ -111,7 +111,7 @@ export default function Algorithm() {
     setIsModalOpen(true);
   };
 
-  const handleModalSave = (data: { name: string; active: boolean; video_count: number }) => {
+  const handleModalSave = (data: { name: string; active: boolean; video_count: number; content_type: string[] }) => {
     if (modalMode === "create" && selectedPoolId) {
       createSequenceMutation.mutate({
         poolId: selectedPoolId,
@@ -119,7 +119,8 @@ export default function Algorithm() {
           name: data.name,
           pool_id: selectedPoolId,
           video_count: data.video_count,
-          active: data.active
+          active: data.active,
+          content_type: data.content_type
         }
       });
     } else if (modalMode === "edit" && selectedSequence && selectedPoolId) {
@@ -129,7 +130,8 @@ export default function Algorithm() {
         data: {
           name: data.name,
           video_count: data.video_count,
-          active: data.active
+          active: data.active,
+          content_type: data.content_type
         }
       });
     }
@@ -141,7 +143,7 @@ export default function Algorithm() {
     setSelectedSequence(null);
   };
 
-      const handleDragEnd = (event: any) => {
+  const handleDragEnd = (event: any) => {
     const { active, over } = event;
 
     if (active.id !== over?.id && currentPool) {
@@ -179,8 +181,6 @@ export default function Algorithm() {
     }
   };
 
-
-
   if (poolsLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -214,12 +214,6 @@ export default function Algorithm() {
           <h1 className="text-3xl font-bold text-gray-900 font-poppins">Algorithm</h1>
           <p className="text-gray-600 font-poppins mt-1">Manage video sequences and algorithm behavior</p>
         </div>
-        <button
-          onClick={handleLogout}
-          className="px-4 py-2 bg-red-600 text-white rounded-lg font-semibold font-poppins hover:bg-red-700 transition-colors duration-200"
-        >
-          Logout
-        </button>
       </div>
 
       {/* Pool Selection Tabs */}
@@ -233,6 +227,13 @@ export default function Algorithm() {
             <p className="text-gray-600 font-poppins">Select and manage video pools</p>
           </div>
         </div>
+       <div className="flex flex-col mb-8 text-sm text-gray-600">
+        <p className="font-semibold">
+          <span className="text-blue-600">Pool A:</span> Free Trial &nbsp; | &nbsp;
+          <span className="text-green-600">Pool B:</span> Paid User (Paid Coins) &nbsp; | &nbsp;
+          <span className="text-red-600">Pool C:</span> Unpaid User (No Coins)
+        </p>
+      </div>
 
         {/* Pool Tabs */}
         <div className="flex space-x-2 mb-8">
@@ -304,95 +305,6 @@ export default function Algorithm() {
             )}
           </div>
         )}
-      </div>
-
-      {/* Algorithm Behavior Section */}
-      <div className="bg-white rounded-2xl p-8 shadow-lg border border-gray-100">
-        <div className="flex items-center space-x-3 mb-6">
-          <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-            <FontAwesomeIcon icon={faRandom} className="w-5 h-5 text-blue-600" />
-          </div>
-          <div>
-            <h2 className="text-xl font-semibold text-gray-900 font-poppins">Algorithm Behavior</h2>
-            <p className="text-gray-600 font-poppins">Configure how videos are selected and displayed after all sequences have played</p>
-          </div>
-        </div>
-
-        <div className="space-y-6">
-          <div className="flex items-center space-x-4">
-            <button
-              onClick={() => setAlgorithmBehavior("exact")}
-              className={`px-6 py-3 rounded-xl font-semibold font-poppins transition-all duration-200 ${
-                algorithmBehavior === "exact"
-                  ? "bg-blue-600 text-white shadow-md"
-                  : "bg-white text-gray-600 hover:bg-gray-50 border border-gray-200"
-              }`}
-            >
-              <FontAwesomeIcon icon={faRepeat} className="w-4 h-4 mr-2" />
-              Exact Order
-            </button>
-            <button
-              onClick={() => setAlgorithmBehavior("random")}
-              className={`px-6 py-3 rounded-xl font-semibold font-poppins transition-all duration-200 ${
-                algorithmBehavior === "random"
-                  ? "bg-blue-600 text-white shadow-md"
-                  : "bg-white text-gray-600 hover:bg-gray-50 border border-gray-200"
-              }`}
-            >
-              <FontAwesomeIcon icon={faRandom} className="w-4 h-4 mr-2" />
-              Random Selection
-            </button>
-          </div>
-
-          {algorithmBehavior === "random" && currentPool && (
-            <div className="bg-gray-50 rounded-xl p-6">
-              <h3 className="text-lg font-semibold text-gray-900 font-poppins mb-4">
-                Select Sequences for Random Mode
-              </h3>
-              <div className="grid grid-cols-2 gap-4">
-                {currentPool.sequences.map((sequence) => (
-                  <label
-                    key={sequence.id}
-                    className="flex items-center space-x-3 p-3 bg-white rounded-lg border border-gray-200 cursor-pointer hover:bg-gray-50"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={selectedSequencesForRandom.includes(sequence.id)}
-                      onChange={() => handleRandomSequenceToggle(sequence.id)}
-                      className="w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
-                    />
-                    <span className="font-medium text-gray-900 font-poppins">
-                      {sequence.name}
-                    </span>
-                  </label>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Info Section */}
-      <div className="bg-blue-50 rounded-2xl p-6 border border-blue-200">
-        <div className="flex items-start space-x-3">
-          <FontAwesomeIcon icon={faInfoCircle} className="w-5 h-5 text-blue-600 mt-1" />
-          <div>
-            <h3 className="text-lg font-semibold text-blue-900 font-poppins mb-2">
-              How Algorithm Works
-            </h3>
-            <div className="space-y-2 text-blue-800 font-poppins">
-              <p>
-                <strong>Exact Order:</strong> Videos are displayed in the exact sequence order you define.
-              </p>
-              <p>
-                <strong>Random Selection:</strong> Videos are randomly selected from the chosen sequences.
-              </p>
-              <p>
-                <strong>Pool Management:</strong> Each pool contains multiple sequences, and sequences contain multiple videos.
-              </p>
-            </div>
-          </div>
-        </div>
       </div>
 
       {/* Sequence Edit Modal */}

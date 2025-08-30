@@ -94,7 +94,7 @@ export default function RegisterDialog({
               icon={faUserPlus}
               className="text-[20px]"
             />
-            {isPending ? "Creating Account..." : "Create Account"}
+            {isPending ? "Submitting..." : "Submit"}
           </button>
         </form>
       </DialogContent>

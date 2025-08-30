@@ -41,14 +41,17 @@ export default function SortableSequenceItem({
     <div
       ref={setNodeRef}
       style={style}
-      {...attributes}
-      {...listeners}
-      className={`bg-gray-50 rounded-xl p-4 border border-gray-200 hover:shadow-md transition-shadow duration-200 cursor-grab active:cursor-grabbing ${
+      className={`bg-gray-50 rounded-xl p-4 border border-gray-200 hover:shadow-md transition-shadow duration-200 ${
         isDragging ? 'shadow-lg' : ''
       } ${isReordering ? 'opacity-75' : ''}`}
     >
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-4">
+      <div className="grid grid-cols-12 gap-4 items-center">
+        {/* Draggable area - 8 out of 12 columns */}
+        <div
+          className="col-span-8 flex items-center space-x-4 cursor-grab active:cursor-grabbing"
+          {...attributes}
+          {...listeners}
+        >
           <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center">
             <FontAwesomeIcon icon={faGripVertical} className="w-4 h-4 text-purple-600" />
           </div>
@@ -58,39 +61,35 @@ export default function SortableSequenceItem({
             </div>
             <div>
               <h4 className="font-semibold text-gray-900 font-poppins">
-                {sequence.name || `Sequence ${sequence.position}`}
+                {sequence.name}
               </h4>
               <p className={`text-sm font-poppins ${
-                sequence.videos_count >= sequence.video_count
-                  ? 'text-green-600'
-                  : sequence.videos_count > 0
-                    ? 'text-orange-600'
-                    : 'text-gray-600'
+                   'text-green-600'
+
               }`}>
-                {sequence.videos_count} / {sequence.video_count} Videos
-                {sequence.videos_count >= sequence.video_count && (
-                  <span className="ml-1">✓</span>
-                )}
+                {sequence.video_count} Videos
               </p>
+              {sequence.content_type && sequence.content_type.length > 0 && (
+                <p className="text-xs text-gray-500 font-poppins">
+                  Content: {sequence.content_type.map(type =>
+                    type.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())
+                  ).join(', ')}
+                </p>
+              )}
             </div>
           </div>
         </div>
 
-        <div className="flex items-center space-x-2">
+        {/* Button area - 4 out of 12 columns */}
+        <div className="col-span-4 flex items-center justify-end space-x-2">
           <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onEdit(sequence);
-            }}
+            onClick={() => onEdit(sequence)}
             className="w-8 h-8 bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center hover:bg-blue-200 transition-colors duration-200"
           >
             <FontAwesomeIcon icon={faEdit} className="w-3 h-3" />
           </button>
           <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onDelete(sequence.id);
-            }}
+            onClick={() => onDelete(sequence.id)}
             disabled={isDeleting}
             className="w-8 h-8 bg-red-100 text-red-600 rounded-lg flex items-center justify-center hover:bg-red-200 transition-colors duration-200 disabled:opacity-50"
           >
