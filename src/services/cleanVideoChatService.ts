@@ -5,7 +5,7 @@ import { pubnubService } from './pubnubService';
 
 export interface WebRTCSignalData {
   type: 'offer' | 'answer' | 'ice-candidate';
-  data: any;
+  data: RTCSessionDescriptionInit | RTCIceCandidateInit;
   target_user_id: string;
 }
 
@@ -16,6 +16,7 @@ export class CleanVideoChatService {
   private currentRoomId: string | null = null;
   private partnerId: string | null = null;
   private isInitiator: boolean = false;
+  private sessionVersion: string | null = null;
   private statusCheckInterval: NodeJS.Timeout | null = null;
   private iceCandidateQueue: RTCIceCandidate[] = [];
   private tokenValidationCache: { token: string; isValid: boolean; timestamp: number } | null = null;
@@ -31,9 +32,6 @@ export class CleanVideoChatService {
   private onPartnerLeftCallback: (() => void) | null = null;
   private onMessageReceivedCallback: ((message: { from: string; text: string; timestamp: number; id?: string }) => void) | null = null;
   private onVideoMatchCallback: ((videoData: { videoId: string; videoUrl: string; videoName: string }) => void) | null = null;
-
-  // Signal listener for incoming WebRTC signals
-  private signalListener: ((event: CustomEvent) => void) | null = null;
 
   constructor() {
     console.log('🎥 CleanVideoChatService initialized');
@@ -58,7 +56,7 @@ export class CleanVideoChatService {
         const userData = JSON.parse(storedUser);
         return userData.id?.toString() || null;
       }
-    } catch (error) {
+    } catch {
       console.warn('Could not parse stored user data');
     }
 
@@ -169,7 +167,7 @@ export class CleanVideoChatService {
       if (storedToken) {
         return storedToken;
       }
-    } catch (error) {
+    } catch {
       console.warn('Could not access localStorage for token');
     }
 
@@ -289,85 +287,81 @@ export class CleanVideoChatService {
     videoId?: string;
     videoUrl?: string;
     videoName?: string;
+    sessionVersion?: string;
+    updatedUserInfo?: {
+      pool_id: number;
+      sequence_id: number;
+      videos_watched_in_current_sequence: number;
+      sequence_total_videos: number;
+    };
   }> {
     try {
       const response = await api.post('/video_chat/swipe', {});
       console.log('🔄 Raw response from backend:', response);
-      console.log('🔄 Response data:', response.data);
-      console.log('🔄 Response keys:', Object.keys(response));
+      console.log('🔄 Response data:', response);
 
-      // Check if response.data exists, otherwise use response directly
-      const responseData = (response.data || response) as {
+      // Type the response data
+      const responseData = response as {
         status: string;
         room_id: string;
         match_type: string;
         partner: { id: string };
         is_initiator: boolean;
+        session_id?: string;
+        session_version?: string;
         video_id?: string;
         video_url?: string;
         video_name?: string;
+        updated_user_info?: {
+          pool_id: number;
+          sequence_id: number;
+          videos_watched_in_current_sequence: number;
+          sequence_total_videos: number;
+        };
       };
 
       console.log('🔄 Parsed response data:', responseData);
-      console.log('🔄 Response status:', responseData.status);
-      console.log('🔄 Response match_type:', responseData.match_type);
+      console.log('🔍 Updated user info:', responseData.updated_user_info);
+
+      // Update auth store with new user info if provided
+      if (responseData.updated_user_info) {
+        const { useAuthStore } = await import('../store/auth');
+        const authStore = useAuthStore.getState();
+
+        authStore.setSequenceInfo(
+          responseData.updated_user_info.sequence_id,
+          responseData.updated_user_info.videos_watched_in_current_sequence,
+          responseData.updated_user_info.sequence_total_videos
+        );
+
+        if (responseData.updated_user_info.pool_id) {
+          authStore.setPoolId(responseData.updated_user_info.pool_id);
+        }
+
+        console.log('✅ Updated auth store with new sequence info');
+      }
 
       if (responseData.status === 'matched') {
+        // Reset WebRTC state but preserve local stream for new match
+        this.resetWebRTCStateOnly();
+
         // Update current room and partner info
         this.currentRoomId = responseData.room_id;
         this.partnerId = responseData.partner.id;
         this.isInitiator = responseData.is_initiator;
+        this.sessionVersion = responseData.session_version || '';
 
-        // Handle different match types
+        console.log('🔍 Set currentRoomId:', this.currentRoomId);
+        console.log('🔍 Set partnerId:', this.partnerId);
+        console.log('🔍 Set isInitiator:', this.isInitiator);
+        console.log('🔍 Set sessionVersion:', this.sessionVersion);
+
+        // Handle the match based on its type
+        console.log('🔍 Processing match type:', responseData.match_type);
+        await this.handleMatchWithErrorHandling(responseData.match_type, responseData);
+
+        // Return the match result
         if (responseData.match_type === 'video') {
-          console.log('🎥 Video match data from backend:', {
-            video_id: responseData.video_id,
-            video_url: responseData.video_url,
-            video_name: responseData.video_name
-          });
-
-          try {
-            let videoStream: MediaStream | null = null;
-
-            // Try to get real video file if video_id is available
-            if (responseData.video_id) {
-              videoStream = await this.createVideoStreamFromFile(parseInt(responseData.video_id));
-            }
-
-            // If we got a video stream, set it as remote stream
-            if (videoStream) {
-              this.remoteStream = videoStream;
-              // Trigger the remote stream callback
-              if (this.onRemoteStreamCallback) {
-                this.onRemoteStreamCallback(videoStream);
-              }
-            } else {
-              // No stream created, but that's okay - VideoPlayer will handle the URL directly
-              // Trigger the video match callback with video data
-              if (this.onVideoMatchCallback && responseData.video_id && responseData.video_url) {
-                console.log('🎥 Triggering video match callback with data:', {
-                  videoId: responseData.video_id.toString(),
-                  videoUrl: responseData.video_url,
-                  videoName: responseData.video_name || 'Video'
-                });
-                this.onVideoMatchCallback({
-                  videoId: responseData.video_id.toString(),
-                  videoUrl: responseData.video_url,
-                  videoName: responseData.video_name || 'Video'
-                });
-              } else {
-                console.log('❌ Video match callback not triggered. Missing:', {
-                  hasCallback: !!this.onVideoMatchCallback,
-                  hasVideoId: !!responseData.video_id,
-                  hasVideoUrl: !!responseData.video_url
-                });
-              }
-            }
-
-          } catch {
-            // Silent error handling
-          }
-
           return {
             success: true,
             roomId: responseData.room_id,
@@ -375,23 +369,28 @@ export class CleanVideoChatService {
             partnerId: 'video',
             videoId: responseData.video_id,
             videoUrl: responseData.video_url || '',
-            videoName: responseData.video_name || 'Video'
+            videoName: responseData.video_name || 'Video',
+            sessionVersion: responseData.session_version,
+            updatedUserInfo: responseData.updated_user_info
           };
         } else if (responseData.match_type === 'staff') {
           return {
             success: true,
             roomId: responseData.room_id,
             matchType: 'staff',
-            partnerId: responseData.partner.id
+            partnerId: responseData.partner.id,
+            sessionVersion: responseData.session_version,
+            updatedUserInfo: responseData.updated_user_info
           };
         } else {
-          // Start WebRTC connection for real user
-          await this.startWebRTCConnection();
+          // Real user match
           return {
             success: true,
             roomId: responseData.room_id,
             matchType: 'real_user',
-            partnerId: responseData.partner.id
+            partnerId: responseData.partner.id,
+            sessionVersion: responseData.session_version,
+            updatedUserInfo: responseData.updated_user_info
           };
         }
       } else {
@@ -757,7 +756,46 @@ Your browser or device does not support camera access.
     return this.remoteStream;
   }
 
-  // Create a simulated video stream for video partner matches
+  // Handle video match - create video player or stream
+  private async handleVideoMatch(videoData: { videoId: string; videoUrl: string; videoName: string }): Promise<void> {
+    console.log('🎥 Handling video match:', videoData);
+    console.log('🎥 onVideoMatchCallback exists:', !!this.onVideoMatchCallback);
+
+    try {
+      // For video matches, directly use the video URL - no need to create streams
+      console.log('🎥 Video match detected - using video URL directly');
+
+      // Trigger the video match callback with video data for the video player component
+      if (this.onVideoMatchCallback) {
+        console.log('🎥 Calling onVideoMatchCallback with video data');
+        this.onVideoMatchCallback({
+          videoId: videoData.videoId,
+          videoUrl: videoData.videoUrl,
+          videoName: videoData.videoName
+        });
+        console.log('✅ onVideoMatchCallback called successfully');
+      } else {
+        console.warn('⚠️ No onVideoMatchCallback set - video cannot be played');
+        console.warn('⚠️ This means no component has registered to handle video matches');
+      }
+
+      console.log('✅ Video match handling completed successfully');
+    } catch (error) {
+      console.error('❌ Error handling video match:', error);
+
+      // Fallback: try to trigger video callback again
+      if (this.onVideoMatchCallback && videoData.videoUrl) {
+        console.log('🔄 Fallback: trying video callback again');
+        this.onVideoMatchCallback({
+          videoId: videoData.videoId,
+          videoUrl: videoData.videoUrl,
+          videoName: videoData.videoName
+        });
+      }
+    }
+  }
+
+  // Create a simulated video stream for fallback scenarios
   private async createSimulatedVideoStream(): Promise<MediaStream | null> {
     try {
       console.log('🎥 Creating simulated video stream...');
@@ -772,56 +810,48 @@ Your browser or device does not support camera access.
         throw new Error('Could not get canvas context');
       }
 
-              // Create a simple animated pattern
-        let frame = 0;
-        const animate = () => {
-          // Clear canvas with bright background
-          ctx.fillStyle = '#ff0000'; // Bright red background
-          ctx.fillRect(0, 0, canvas.width, canvas.height);
+      // Create a simple animated pattern
+      let frame = 0;
+      const animate = () => {
+        // Clear canvas with bright background
+        ctx.fillStyle = '#ff0000'; // Bright red background
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-          // Draw animated elements with high contrast
-          ctx.fillStyle = '#ffffff'; // White text
-          ctx.font = 'bold 48px Arial';
-          ctx.textAlign = 'center';
-          ctx.fillText('VIDEO PARTNER', canvas.width / 2, canvas.height / 2);
+        // Draw animated elements with high contrast
+        ctx.fillStyle = '#ffffff'; // White text
+        ctx.font = 'bold 48px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText('VIDEO PARTNER', canvas.width / 2, canvas.height / 2);
 
-          ctx.fillStyle = '#ffff00'; // Bright yellow
-          ctx.font = 'bold 24px Arial';
-          ctx.fillText(`Frame: ${frame}`, canvas.width / 2, canvas.height / 2 + 50);
+        ctx.fillStyle = '#ffff00'; // Bright yellow
+        ctx.font = 'bold 24px Arial';
+        ctx.fillText(`Frame: ${frame}`, canvas.width / 2, canvas.height / 2 + 50);
 
-          // Add moving elements to make it obvious
-          ctx.fillStyle = '#00ffff'; // Bright cyan
-          ctx.beginPath();
-          ctx.arc(100 + (frame * 2) % 400, 100, 20, 0, 2 * Math.PI);
-          ctx.fill();
+        // Add moving elements to make it obvious
+        ctx.fillStyle = '#00ffff'; // Bright cyan
+        ctx.beginPath();
+        ctx.arc(100 + (frame * 2) % 400, 100, 20, 0, 2 * Math.PI);
+        ctx.fill();
 
-          ctx.fillStyle = '#ff00ff'; // Bright magenta
-          ctx.beginPath();
-          ctx.arc(500 - (frame * 3) % 400, 300, 25, 0, 2 * Math.PI);
-          ctx.fill();
+        ctx.fillStyle = '#ff00ff'; // Bright magenta
+        ctx.beginPath();
+        ctx.arc(500 - (frame * 3) % 400, 300, 25, 0, 2 * Math.PI);
+        ctx.fill();
 
-          // Log every 10 frames to verify animation is running
-          if (frame % 10 === 0) {
-            console.log('🎨 Canvas animation frame:', frame);
-          }
+        frame++;
+      };
 
-          frame++;
-        };
+      // Start animation immediately
+      animate(); // Draw first frame immediately
 
-              // Start animation immediately
-        animate(); // Draw first frame immediately
+      // Start animation loop
+      const animationInterval = setInterval(animate, 100);
 
-        // Start animation loop
-        const animationInterval = setInterval(animate, 100);
+      // Capture the canvas as a video stream
+      const stream = canvas.captureStream(10); // 10 FPS
 
-        // Capture the canvas as a video stream
-        const stream = canvas.captureStream(10); // 10 FPS
-
-        // Store the interval so we can clean it up later
-        (stream as any)._animationInterval = animationInterval;
-
-        console.log('🎨 Canvas animation started with interval:', animationInterval);
-        console.log('🎨 Canvas dimensions:', canvas.width, 'x', canvas.height);
+      // Store the interval so we can clean it up later
+      (stream as any)._animationInterval = animationInterval;
 
       console.log('✅ Simulated video stream created');
       return stream;
@@ -831,9 +861,11 @@ Your browser or device does not support camera access.
     }
   }
 
-    // Fetch video details and create video stream from actual video file
+  // Fetch video details and create video stream from actual video file
   private async createVideoStreamFromFile(videoId: number): Promise<MediaStream | null> {
     try {
+      console.log('🎥 Attempting to create video stream from file ID:', videoId);
+
       // Fetch video details from backend
       const response = await fetch(`http://localhost:3000/api/v1/videos/${videoId}/public`);
 
@@ -845,16 +877,37 @@ Your browser or device does not support camera access.
       const video = data.data.video;
 
       if (!video.video_file_url) {
-        return await this.createSimulatedVideoStream();
+        console.log('⚠️ Video has no file URL, falling back to simulated stream');
+        return null;
       }
 
-      // Instead of trying to create a complex stream, let's use the direct URL
-      // This will be handled by the VideoPlayer component directly
-      return null;
+      // Try to create a video element and capture its stream
+      const videoElement = document.createElement('video');
+      videoElement.crossOrigin = 'anonymous';
+      videoElement.muted = true;
+      videoElement.playsInline = true;
+      videoElement.src = video.video_file_url;
+
+      // Wait for video to load
+      await new Promise((resolve, reject) => {
+        videoElement.onloadedmetadata = resolve;
+        videoElement.onerror = reject;
+        videoElement.load();
+      });
+
+      // Try to capture the video stream
+      try {
+        const stream = videoElement.captureStream();
+        console.log('✅ Video stream captured successfully from file');
+        return stream;
+      } catch (captureError) {
+        console.warn('⚠️ Could not capture video stream, falling back to URL:', captureError);
+        return null;
+      }
 
     } catch (error) {
       console.error('❌ Failed to create video stream from file:', error);
-      return await this.createSimulatedVideoStream();
+      return null;
     }
   }
 
@@ -955,7 +1008,17 @@ Your browser or device does not support camera access.
           return;
         }
 
-        const response = await api.get('/video_chat/status') as any;
+        const response = await api.get('/video_chat/status') as {
+          status: string;
+          room_id: string;
+          match_type: string;
+          partner: { id: string };
+          is_initiator: boolean;
+          session_version?: string;
+          video_id?: string;
+          video_url?: string;
+          video_name?: string;
+        };
 
         console.log('🔍 Status check response:', response);
         console.log('🔍 Response type:', typeof response);
@@ -973,10 +1036,12 @@ Your browser or device does not support camera access.
           this.currentRoomId = response.room_id;
           this.partnerId = response.partner.id;
           this.isInitiator = response.is_initiator;
+          this.sessionVersion = response.session_version || '';
 
           console.log('🔍 Set currentRoomId:', this.currentRoomId);
           console.log('🔍 Set partnerId:', this.partnerId);
           console.log('🔍 Set isInitiator:', this.isInitiator);
+          console.log('🔍 Set sessionVersion:', this.sessionVersion);
 
           // Process any queued ICE candidates that were generated before room info was set
           if (this.iceCandidateQueue.length > 0) {
@@ -992,105 +1057,7 @@ Your browser or device does not support camera access.
           }
 
           // Handle different match types
-          if (response.match_type === 'video') {
-            try {
-              let videoStream: MediaStream | null = null;
-
-              // Try to get real video file if video_id is available
-              if (response.video_id) {
-                videoStream = await this.createVideoStreamFromFile(response.video_id);
-              } else {
-                videoStream = await this.createSimulatedVideoStream();
-              }
-
-              // If we got a video stream, set it as remote stream
-              if (videoStream) {
-                this.remoteStream = videoStream;
-                // Trigger the remote stream callback
-                if (this.onRemoteStreamCallback) {
-                  this.onRemoteStreamCallback(videoStream);
-                }
-              } else {
-                // No stream created, but that's okay - VideoPlayer will handle the URL directly
-                // Trigger the video match callback with video data
-                if (this.onVideoMatchCallback && response.video_id && response.video_url) {
-                  this.onVideoMatchCallback({
-                    videoId: response.video_id.toString(),
-                    videoUrl: response.video_url,
-                    videoName: response.video_name || 'Video'
-                  });
-                }
-              }
-            } catch (error) {
-              console.error('❌ Failed to create video stream via status check:', error);
-              // Log more details about the error
-              if (error instanceof Error) {
-                console.error('❌ Error details:', error.message, error.stack);
-              } else {
-                console.error('❌ Unknown error type:', typeof error, error);
-              }
-            }
-          } else if (response.match_type === 'staff') {
-            console.log('👨‍💼 Matched with staff member, starting WebRTC...');
-            // Start WebRTC connection for staff
-            await this.startWebRTCConnection();
-          } else if (response.match_type === 'real_user') {
-            console.log('👤 Matched with real user, setting up WebRTC...');
-
-            // Log current state before setup
-            this.logConnectionState();
-
-            // Ensure signal listener is set up for the room
-            await this.ensureSignalListenerSetup();
-
-            // Log state after signal listener setup
-            this.logConnectionState();
-
-            // For real user matches, we need to handle the connection carefully
-            // Only the initiator should create and send the offer
-            if (response.is_initiator) {
-              console.log('🚀 Initiator: Creating and sending offer...');
-              try {
-                // Verify room and partner info is set
-                if (!this.currentRoomId || !this.partnerId) {
-                  throw new Error('Room or partner info not set before starting WebRTC connection');
-                }
-
-                // Small delay to ensure both users are ready
-                await new Promise(resolve => setTimeout(resolve, 500));
-                await this.startWebRTCConnection();
-                console.log('✅ WebRTC connection started successfully for initiator');
-
-                // Log state after WebRTC connection
-                this.logConnectionState();
-              } catch (error) {
-                console.error('❌ Failed to start WebRTC connection for initiator:', error);
-                // Reset state and try again
-                this.resetWebRTCState();
-              }
-            } else {
-              console.log('⏳ Non-initiator: Waiting for offer from partner...');
-              try {
-                // Verify room and partner info is set
-                if (!this.currentRoomId || !this.partnerId) {
-                  throw new Error('Room or partner info not set before setting up peer connection');
-                }
-
-                // Small delay to ensure PubNub connection is fully established
-                await new Promise(resolve => setTimeout(resolve, 1000));
-                // Just set up the peer connection and wait for the offer
-                await this.setupPeerConnectionOnly();
-                console.log('✅ Peer connection set up for non-initiator');
-
-                // Log state after peer connection setup
-                this.logConnectionState();
-              } catch (error) {
-                console.error('❌ Failed to set up peer connection for non-initiator:', error);
-                // Reset state and try again
-                this.resetWebRTCState();
-              }
-            }
-          }
+          await this.handleMatchWithErrorHandling(response.match_type, response);
         }
       } catch (error) {
         console.error('❌ Error checking status:', error);
@@ -1236,182 +1203,168 @@ Your browser or device does not support camera access.
     return true;
   }
 
-  // Send WebRTC signal
-  private async sendSignal(type: string, data: any): Promise<void> {
-    console.log(`📤 Sending ${type} signal`);
-
-    // Validate connection state before sending
-    if (!this.validateConnectionState()) {
-      console.error('❌ Cannot send signal: connection state validation failed');
-      console.error('❌ Current Room ID:', this.currentRoomId);
-      console.error('❌ Partner ID:', this.partnerId);
-      console.error('❌ Call stack:', new Error().stack);
+  // Send WebRTC signal via PubNub with session versioning
+  private async sendSignal(type: string, data: RTCSessionDescriptionInit | RTCIceCandidateInit): Promise<void> {
+    if (!this.currentRoomId || !this.partnerId || !this.sessionVersion) {
+      console.warn('⚠️ Cannot send signal: missing room, partner, or session version info');
       return;
     }
 
-    // At this point, we know currentRoomId and partnerId are not null due to validation
-    const roomId = this.currentRoomId!;
-    const partnerId = this.partnerId!;
-
-    console.log(`📤 Signal details:`, {
-      type,
-      data,
-      roomId,
-      partnerId,
-      from: this.getAuthenticatedUserId()
-    });
-
     try {
-      // Send WebRTC signal via PubNub
-      await pubnubService.sendWebRTCSignal({
-        type: type as 'offer' | 'answer' | 'ice-candidate',
-        data,
-        from: this.getAuthenticatedUserId() || 'unknown',
-        to: partnerId,
-        chatId: roomId
-      });
+      const userId = this.getAuthenticatedUserId();
+      if (!userId) {
+        throw new Error('No user ID available for signal sending');
+      }
 
-      console.log(`✅ Signal ${type} sent via PubNub for room ${roomId}`);
+      console.log(`📤 Sending ${type} signal to partner ${this.partnerId}`);
 
-      // Log the signal that was sent for debugging
-      console.log(`📤 Sent signal payload:`, {
-        type,
-        data,
-        from: this.getAuthenticatedUserId(),
-        to: partnerId,
-        chatId: roomId
-      });
+      switch (type) {
+        case 'offer':
+          if ('sdp' in data) {
+            await pubnubService.sendOffer(this.partnerId, 'initiator', data.sdp || '');
+            console.log('✅ Offer sent successfully');
+          }
+          break;
+        case 'answer':
+          if ('sdp' in data) {
+            await pubnubService.sendAnswer(this.partnerId, 'receiver', data.sdp || '');
+            console.log('✅ Answer sent successfully');
+          }
+          break;
+        case 'ice-candidate':
+          await pubnubService.sendIceCandidate(this.partnerId, 'initiator', data);
+          console.log('✅ ICE candidate sent successfully');
+          break;
+        default:
+          console.warn('⚠️ Unknown signal type:', type);
+      }
     } catch (error) {
       console.error(`❌ Failed to send ${type} signal:`, error);
-      console.error(`❌ Signal details:`, { type, data, roomId, partnerId });
+      throw error;
+    }
+  }
+
+  // Send handshake signals for connection establishment
+  private async sendHandshakeSignals(): Promise<void> {
+    if (!this.partnerId) {
+      console.warn('⚠️ Cannot send handshake signals: no partner ID');
+      return;
+    }
+
+    try {
+      // Send hello signal
+      await pubnubService.sendHello(this.partnerId, this.isInitiator ? 'initiator' : 'receiver');
+      console.log('👋 Hello signal sent');
+
+      // If we're the receiver, also send ready signal
+      if (!this.isInitiator) {
+        await pubnubService.sendReady(this.partnerId, 'receiver');
+        console.log('✅ Ready signal sent');
+      }
+    } catch (error) {
+      console.error('❌ Failed to send handshake signals:', error);
+      throw error;
     }
   }
 
   // Listen for incoming signals from other users via PubNub
   private setupSignalListener(): void {
-    if (!this.currentRoomId) {
-      console.warn('⚠️ Cannot set up signal listener: no room ID');
-      return;
-    }
-
-    console.log('🔔 Setting up PubNub signal listener for room:', this.currentRoomId);
-
-    // Set up WebRTC signal handler
-    const webrtcCleanup = pubnubService.onWebRTCSignal((signal) => {
-      console.log('🔗 WebRTC signal handler activated for signal:', signal.type);
-
-      // Ignore signals from ourselves
-      if (signal.from === this.getAuthenticatedUserId()) {
-        console.log('🔄 Ignoring own signal:', signal.type);
-        return;
-      }
-
-      console.log('📨 Received WebRTC signal via PubNub:', signal.type, 'from:', signal.from);
-      console.log('📨 Signal data:', signal.data);
-      console.log('📨 Current room ID:', this.currentRoomId);
-      console.log('📨 Partner ID:', this.partnerId);
-
-      this.handleIncomingSignal({
-        type: signal.type,
-        data: signal.data,
-        from: signal.from
-      });
-    });
-
-    // Store cleanup function for later use
-    this.webrtcSignalCleanup = webrtcCleanup;
-
-    // Set up general message listener for chat messages
-    const generalMessageCleanup = pubnubService.onMessage((message) => {
-      console.log('💬 Received general message via PubNub:', message);
-
-      // Check if this is a WebRTC signal (fallback handling)
-      if (message && typeof message === 'object' && 'type' in message && 'data' in message) {
-        const webrtcMessage = message as any;
-        if (webrtcMessage.type === 'offer' || webrtcMessage.type === 'answer' || webrtcMessage.type === 'ice-candidate') {
-          console.log('📨 Received WebRTC signal via general message (fallback):', webrtcMessage.type);
-          console.log('📨 Signal data:', webrtcMessage.data);
-          console.log('📨 From user:', webrtcMessage.from);
-
-          // Process the WebRTC signal
-          this.handleIncomingSignal({
-            type: webrtcMessage.type,
-            data: webrtcMessage.data,
-            from: webrtcMessage.from
-          });
-          return; // Don't process as chat message
-        }
-      }
-
-      // Check if this is a chat message
-      if (message && typeof message === 'object' && 'sender' in message && 'text' in message) {
-        const chatMessage = message as any;
-
-        // Ignore messages from ourselves - this prevents seeing our own messages twice
-        if (chatMessage.sender === this.getAuthenticatedUserId()) {
-          console.log('🔄 Ignoring own chat message from PubNub:', chatMessage.text);
-          return;
-        }
-
-        console.log('📨 Processing incoming chat message from other user:', chatMessage);
-
-        // Handle the chat message
-        this.handleChatMessage({
-          from: chatMessage.sender,
-          text: chatMessage.text,
-          timestamp: chatMessage.timestamp || Date.now()
-        });
-      } else if (message && typeof message === 'object' && 'type' in message && message.type === 'chat-message') {
-        // Handle custom chat message format
-        const customMessage = message as any;
-        if (customMessage.data && customMessage.data.from !== this.getAuthenticatedUserId()) {
-          console.log('📨 Processing custom chat message from other user:', customMessage.data);
-
-          this.handleChatMessage({
-            from: customMessage.data.from,
-            text: customMessage.data.text,
-            timestamp: customMessage.data.timestamp || Date.now()
-          });
-        } else {
-          console.log('🔄 Ignoring custom chat message from self:', customMessage.data);
-        }
-      }
-    });
-
-    // Store cleanup function for later use
-    this.generalMessageCleanup = generalMessageCleanup;
-
-    console.log('✅ Signal listener setup completed for room:', this.currentRoomId);
+    // This method is deprecated - signals are now handled by setupPubNubConnection
+    console.log('⚠️ setupSignalListener is deprecated - using new session-versioned approach');
   }
 
   // Remove signal listener
   private removeSignalListener(): void {
     console.log('🔕 Removing signal listeners...');
 
-    // Clean up WebRTC signal listener
-    if (this.webrtcSignalCleanup) {
-      this.webrtcSignalCleanup();
-      this.webrtcSignalCleanup = null;
-      console.log('✅ WebRTC signal listener removed');
-    }
-
-    // Clean up general message listener
-    if (this.generalMessageCleanup) {
-      this.generalMessageCleanup();
-      this.generalMessageCleanup = null;
-      console.log('✅ General message listener removed');
-    }
-
-    // Disconnect from PubNub
+    // Clean up PubNub connection
     if (this.currentRoomId) {
-      pubnubService.disconnect();
+      pubnubService.leave();
       console.log('✅ Disconnected from PubNub');
+    }
+
+    // Clear cleanup functions
+    this.webrtcSignalCleanup = null;
+    this.generalMessageCleanup = null;
+  }
+
+  // Set up PubNub connection with session versioning
+  private async setupPubNubConnection(): Promise<void> {
+    if (!this.currentRoomId || !this.partnerId || !this.sessionVersion) {
+      console.warn('⚠️ Cannot set up PubNub connection: missing room, partner, or session version info');
+      return;
+    }
+
+    console.log('🔌 Setting up PubNub connection for room:', this.currentRoomId);
+    console.log('🔌 Session version:', this.sessionVersion);
+    console.log('🔌 Partner ID:', this.partnerId);
+    console.log('🔌 Is initiator:', this.isInitiator);
+
+    try {
+      const userId = this.getAuthenticatedUserId();
+      if (!userId) {
+        throw new Error('No user ID available for PubNub connection');
+      }
+
+      // Join PubNub channel with session versioning
+      pubnubService.join(
+        this.currentRoomId,
+        this.sessionVersion,
+        userId,
+        {
+          onMessage: (signal) => this.handleIncomingSignal(signal),
+          onJoin: () => console.log('✅ Joined PubNub channel successfully'),
+          onLeave: () => console.log('👋 Left PubNub channel'),
+          onError: (error) => console.error('❌ PubNub error:', error)
+        }
+      );
+
+      console.log('✅ PubNub connection setup completed');
+    } catch (error) {
+      console.error('❌ Failed to set up PubNub connection:', error);
+      throw error;
     }
   }
 
-  // Handle incoming WebRTC signals
-  async handleIncomingSignal(signal: { type: string; data: any; from: string }): Promise<void> {
-    console.log('📨 Received signal:', signal.type, 'from:', signal.from);
+  // Handle incoming WebRTC signals from PubNub
+  private async handleIncomingSignal(signal: {
+    type: string;
+    matchId: string;
+    sessionVersion: string;
+    from: string;
+    to?: string;
+    role: 'initiator' | 'receiver';
+    sdp?: string;
+    candidate?: RTCIceCandidateInit;
+    correlationId: string;
+    ts: number;
+  }): Promise<void> {
+    console.log('📨 Received signal:', signal.type, 'from:', signal.from, 'to:', signal.to);
+
+    // Verify this signal is from our partner (convert both to strings for comparison)
+    const signalFromStr = signal.from.toString();
+    const partnerIdStr = this.partnerId?.toString();
+
+    if (signalFromStr !== partnerIdStr) {
+      console.log('⚠️ Ignoring signal from wrong partner. Expected:', partnerIdStr, 'Got:', signalFromStr);
+      return;
+    }
+
+    // For staff matches, be more permissive with the 'to' field
+    // Staff users might not always set the 'to' field correctly
+    const currentUserId = this.getAuthenticatedUserId();
+    if (signal.to && signal.to.toString() !== currentUserId?.toString()) {
+      console.log('⚠️ Ignoring signal not intended for us. Expected:', currentUserId, 'Got:', signal.to);
+      return;
+    }
+
+    // Verify session version matches
+    if (signal.sessionVersion !== this.sessionVersion) {
+      console.log('⚠️ Ignoring signal with stale session version. Expected:', this.sessionVersion, 'Got:', signal.sessionVersion);
+      return;
+    }
+
+    console.log('✅ Signal validation passed, processing...');
 
     if (!this.peerConnection) {
       console.log('⚠️ No peer connection, setting up now...');
@@ -1426,13 +1379,28 @@ Your browser or device does not support camera access.
     try {
       switch (signal.type) {
         case 'offer':
-          await this.handleOffer(signal.data);
+          if (signal.sdp) {
+            await this.handleOffer({ sdp: signal.sdp, type: 'offer' });
+          }
           break;
         case 'answer':
-          await this.handleAnswer(signal.data);
+          if (signal.sdp) {
+            await this.handleAnswer({ sdp: signal.sdp, type: 'answer' });
+          }
           break;
-        case 'ice-candidate':
-          await this.handleIceCandidate(signal.data);
+        case 'ice':
+          if (signal.candidate) {
+            await this.handleIceCandidate(signal.candidate);
+          }
+          break;
+        case 'hello':
+          console.log('👋 Received hello from partner, sending ready...');
+          if (this.partnerId) {
+            pubnubService.sendReady(this.partnerId, this.isInitiator ? 'initiator' : 'receiver');
+          }
+          break;
+        case 'ready':
+          console.log('✅ Partner is ready for WebRTC connection');
           break;
         default:
           console.log('⚠️ Unknown signal type:', signal.type);
@@ -1566,7 +1534,7 @@ Your browser or device does not support camera access.
 
     if (!this.peerConnection!.remoteDescription) {
       // Queue candidate for later
-      this.iceCandidateQueue.push(candidateData);
+      this.iceCandidateQueue.push(new RTCIceCandidate(candidateData));
       console.log('📦 Queued ICE candidate for later processing');
       return;
     }
@@ -1621,7 +1589,7 @@ Your browser or device does not support camera access.
     }
 
     console.log(`📦 Flushing ${this.iceCandidateQueue.length} queued ICE candidates`);
-    
+
     // Send all queued candidates
     for (const candidateData of this.iceCandidateQueue) {
       try {
@@ -1703,6 +1671,7 @@ Your browser or device does not support camera access.
     this.currentRoomId = null;
     this.partnerId = null;
     this.isInitiator = false;
+    this.sessionVersion = null;
 
     console.log('✅ WebRTC state reset complete');
   }
@@ -1727,9 +1696,6 @@ Your browser or device does not support camera access.
 
       // Set up event handlers
       this.setupPeerConnectionHandlers();
-
-      // Set up signal listener for incoming WebRTC signals
-      this.setupSignalListener();
 
       // Add local stream
       if (this.localStream) {
@@ -1776,9 +1742,6 @@ Your browser or device does not support camera access.
       // Set up event handlers
       this.setupPeerConnectionHandlers();
 
-      // Set up signal listener for incoming WebRTC signals
-      this.setupSignalListener();
-
       // Add local stream
       if (this.localStream) {
         this.localStream.getTracks().forEach(track => {
@@ -1791,16 +1754,25 @@ Your browser or device does not support camera access.
         console.warn('⚠️ No local stream available for WebRTC connection');
       }
 
-      // Create and send offer
-      const offer = await this.peerConnection.createOffer();
-      console.log('✅ Offer created successfully');
+      // Send handshake signals first
+      await this.sendHandshakeSignals();
 
-      await this.peerConnection.setLocalDescription(offer);
-      console.log('✅ Local description (offer) set successfully');
+      // Only create and send offer if we're the initiator
+      if (this.isInitiator) {
+        // Wait a bit for handshake to complete
+        await new Promise(resolve => setTimeout(resolve, 1000));
 
-      // Send offer to partner
-      this.sendSignal('offer', offer);
-      console.log('✅ Offer sent to partner');
+        // Create and send offer
+        const offer = await this.peerConnection.createOffer();
+        console.log('✅ Offer created successfully');
+
+        await this.peerConnection.setLocalDescription(offer);
+        console.log('✅ Local description (offer) set successfully');
+
+        // Send offer to partner
+        await this.sendSignal('offer', offer);
+        console.log('✅ Offer sent to partner');
+      }
 
       console.log('✅ WebRTC connection started successfully');
     } catch (error) {
@@ -1851,54 +1823,208 @@ Your browser or device does not support camera access.
     }
   }
 
-  // Clean up resources
+  // Handle match with simplified logic
+  private async handleMatchWithErrorHandling(matchType: string, matchData: any): Promise<void> {
+    console.log(`🔍 Handling match with simplified logic`);
+    console.log('🔍 Match data:', matchData);
+    console.log('🔍 Match type:', matchType);
+    console.log('🔍 Video ID:', matchData.video_id);
+    console.log('🔍 Video URL:', matchData.video_url);
+    console.log('🔍 Partner:', matchData.partner);
+
+    try {
+      // Simplified logic: Only two cases matter for frontend
+      if (matchData.video_id && matchData.video_url) {
+        // Case 1: Video Match - Start video player
+        console.log('🎥 Video match detected - starting video player...');
+        console.log('🎥 Video data:', {
+          videoId: matchData.video_id?.toString() || 'unknown',
+          videoUrl: matchData.video_url || '',
+          videoName: matchData.video_name || 'Video'
+        });
+
+        await this.handleVideoMatch({
+          videoId: matchData.video_id?.toString() || 'unknown',
+          videoUrl: matchData.video_url || '',
+          videoName: matchData.video_name || 'Video'
+        });
+      } else if (matchData.partner && matchData.partner.id) {
+        // Case 2: Live Connection (staff or real user) - Start WebRTC
+        console.log('🔗 Live connection detected - starting WebRTC...');
+        console.log('🔗 Partner ID:', matchData.partner.id);
+        console.log('🔗 Is Initiator:', this.isInitiator);
+
+        await this.setupPubNubConnection();
+
+        if (this.isInitiator) {
+          await this.startWebRTCConnection();
+        } else {
+          await this.setupPeerConnectionOnly();
+        }
+      } else {
+        console.warn('⚠️ Unknown match type - no video data and no partner info');
+        console.warn('⚠️ Video ID exists:', !!matchData.video_id);
+        console.warn('⚠️ Video URL exists:', !!matchData.video_url);
+        console.warn('⚠️ Partner exists:', !!matchData.partner);
+        throw new Error('Invalid match data - missing video or partner information');
+      }
+
+      console.log(`✅ Match handling completed successfully`);
+    } catch (error) {
+      console.error(`❌ Error handling match:`, error);
+
+      // Implement fallback strategies
+      await this.handleMatchFallback(matchData, error);
+    }
+  }
+
+  // Simplified fallback handling
+  private async handleMatchFallback(matchData: any, error: unknown): Promise<void> {
+    console.log(`🔄 Implementing fallback for failed match`);
+
+    try {
+      if (matchData.video_id && matchData.video_url) {
+        // Video fallback: try simulated stream
+        console.log('🎥 Video fallback: creating simulated stream');
+        const fallbackStream = await this.createSimulatedVideoStream();
+        if (fallbackStream) {
+          this.remoteStream = fallbackStream;
+          if (this.onRemoteStreamCallback) {
+            this.onRemoteStreamCallback(fallbackStream);
+          }
+        }
+      } else {
+        // WebRTC fallback: try to reconnect
+        console.log('🔗 WebRTC fallback: attempting reconnection');
+        await this.attemptReconnection();
+      }
+    } catch (fallbackError) {
+      console.error('❌ Fallback also failed:', fallbackError);
+
+      // Notify user of connection failure
+      if (this.onConnectionStateCallback) {
+        this.onConnectionStateCallback('failed' as RTCPeerConnectionState);
+      }
+    }
+  }
+
+  // Attempt to reconnect after failure
+  private async attemptReconnection(): Promise<void> {
+    console.log('🔄 Attempting reconnection...');
+
+    try {
+      // Check if we have the minimum required parameters
+      if (!this.currentRoomId || !this.partnerId) {
+        console.warn('⚠️ Cannot reconnect: missing room ID or partner ID');
+        console.log('🔍 Current state:', {
+          roomId: this.currentRoomId,
+          partnerId: this.partnerId,
+          sessionVersion: this.sessionVersion
+        });
+
+        // Instead of failing, trigger a new match request
+        console.log('🔄 Triggering new match request instead of reconnection');
+        await this.requestNewMatch();
+        return;
+      }
+
+      // Reset current state
+      this.resetWebRTCState();
+
+      // Wait a bit before retrying
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
+      // Try to set up connection again
+      if (this.currentRoomId && this.partnerId && this.sessionVersion) {
+        await this.setupPubNubConnection();
+
+        if (this.isInitiator) {
+          await this.startWebRTCConnection();
+        } else {
+          await this.setupPeerConnectionOnly();
+        }
+
+        console.log('✅ Reconnection successful');
+      } else {
+        throw new Error('Missing connection parameters for reconnection');
+      }
+    } catch (error) {
+      console.error('❌ Reconnection failed:', error);
+      throw error;
+    }
+  }
+
+  // Request a new match when reconnection fails
+  private async requestNewMatch(): Promise<void> {
+    console.log('🔄 Requesting new match...');
+
+    try {
+      // Call the swipe endpoint to get a new match
+      const result = await this.swipeToNext();
+
+      if (result.success) {
+        console.log('✅ New match obtained successfully');
+      } else {
+        console.warn('⚠️ Failed to get new match - requesting new match');
+      }
+    } catch (error) {
+      console.error('❌ Error requesting new match:', error);
+    }
+  }
+
+  // Enhanced cleanup with proper resource management
   cleanup(): void {
-    console.log('🧹 Cleaning up video chat service...');
+    console.log('🧹 Starting comprehensive cleanup...');
 
-    // Remove signal listener
-    this.removeSignalListener();
+    try {
+      // Clean up PubNub connection
+      if (this.currentRoomId) {
+        pubnubService.leave();
+        console.log('✅ PubNub connection cleaned up');
+      }
 
-    // Clean up PubNub listeners
-    if (this.webrtcSignalCleanup) {
-      this.webrtcSignalCleanup();
+      // Clean up WebRTC resources
+      this.resetWebRTCState();
+
+      // Clean up video streams
+      if (this.localStream) {
+        this.localStream.getTracks().forEach(track => {
+          track.stop();
+          console.log('🛑 Local stream track stopped:', track.kind);
+        });
+        this.localStream = null;
+      }
+
+      if (this.remoteStream) {
+        this.remoteStream.getTracks().forEach(track => {
+          track.stop();
+          console.log('🛑 Remote stream track stopped:', track.kind);
+        });
+        this.remoteStream = null;
+      }
+
+      // Clean up intervals
+      if (this.statusCheckInterval) {
+        clearInterval(this.statusCheckInterval);
+        this.statusCheckInterval = null;
+        console.log('🛑 Status check interval cleared');
+      }
+
+      // Clear callbacks
+      this.onRemoteStreamCallback = null;
+      this.onConnectionStateCallback = null;
+      this.onPartnerLeftCallback = null;
+      this.onMessageReceivedCallback = null;
+      this.onVideoMatchCallback = null;
+
+      // Clear cleanup functions
       this.webrtcSignalCleanup = null;
-      console.log('✅ WebRTC signal cleanup completed');
-    }
-
-    if (this.generalMessageCleanup) {
-      this.generalMessageCleanup();
       this.generalMessageCleanup = null;
-      console.log('✅ General message cleanup completed');
+
+      console.log('✅ Comprehensive cleanup completed');
+    } catch (error) {
+      console.error('❌ Error during cleanup:', error);
     }
-
-    // Clear intervals
-    if (this.statusCheckInterval) {
-      clearInterval(this.statusCheckInterval);
-      this.statusCheckInterval = null;
-    }
-
-    // Reset WebRTC state
-    this.resetWebRTCState();
-
-    // Clear streams
-    if (this.localStream) {
-      this.localStream.getTracks().forEach(track => track.stop());
-      this.localStream = null;
-    }
-
-    if (this.remoteStream) {
-      this.remoteStream.getTracks().forEach(track => track.stop());
-      this.remoteStream = null;
-    }
-
-    // Clear callbacks
-    this.onRemoteStreamCallback = null;
-    this.onConnectionStateCallback = null;
-    this.onPartnerLeftCallback = null;
-    this.onMessageReceivedCallback = null;
-    this.onVideoMatchCallback = null;
-
-    console.log('✅ Video chat service cleanup completed');
   }
 
   // Manually refresh token validation (useful for testing or when token is refreshed)
@@ -1942,12 +2068,45 @@ Your browser or device does not support camera access.
   }
 
   // Get current room information
-  getCurrentRoomInfo(): { roomId: string | null; partnerId: string | null; isInitiator: boolean } {
+  getCurrentRoomInfo(): { roomId: string | null; partnerId: string | null; isInitiator: boolean; sessionVersion: string | null } {
     return {
       roomId: this.currentRoomId,
       partnerId: this.partnerId,
-      isInitiator: this.isInitiator
+      isInitiator: this.isInitiator,
+      sessionVersion: this.sessionVersion
     };
+  }
+
+  // Reset only WebRTC state without clearing local stream (for staff/real user matches)
+  private resetWebRTCStateOnly(): void {
+    console.log('🔄 Resetting WebRTC state only (preserving local stream)...');
+
+    // Close peer connection
+    if (this.peerConnection) {
+      this.peerConnection.close();
+      console.log('✅ Peer connection closed successfully');
+      this.peerConnection = null;
+    }
+
+    // Clear remote stream
+    if (this.remoteStream) {
+      this.remoteStream.getTracks().forEach(track => {
+        track.stop();
+        console.log('🛑 Remote stream track stopped:', track.kind);
+      });
+      this.remoteStream = null;
+    }
+
+    // Clear WebRTC-related state
+    this.currentRoomId = null;
+    this.partnerId = null;
+    this.isInitiator = false;
+    this.sessionVersion = null;
+
+    // Clear ICE candidate queue
+    this.iceCandidateQueue = [];
+
+    console.log('✅ WebRTC state reset complete (local stream preserved)');
   }
 }
 

@@ -75,26 +75,34 @@ export default function PaidStaff() {
     {
       key: "status",
       label: "Status",
-      render: (value: unknown): React.ReactNode => (
-        <div className="flex items-center space-x-2">
-          <div className={`w-2 h-2 rounded-full ${
-            value === 'online' ? 'bg-green-500' :
-            value === 'in_chat' ? 'bg-blue-500' :
-            value === 'busy' ? 'bg-yellow-500' : 'bg-gray-400'
-          }`}></div>
-          <span className={`text-sm ${
-            value === 'online' ? 'text-green-600' :
-            value === 'in_chat' ? 'text-blue-600' :
-            value === 'busy' ? 'text-yellow-600' : 'text-gray-500'
-          }`}>
-            {value === 'online' ? 'Online' :
-             value === 'in_chat' ? 'In Chat' :
-             value === 'busy' ? 'Busy' : 'Offline'}
-          </span>
-        </div>
-      )
+      render: (value: unknown): React.ReactNode => {
+        // Map backend enum values to frontend display
+        const statusMap: Record<string, { label: string; color: string; bgColor: string }> = {
+          '0': { label: 'Online', color: 'text-green-600', bgColor: 'bg-green-500' },      // online
+          '1': { label: 'In Chat', color: 'text-blue-600', bgColor: 'bg-blue-500' },      // in_chat
+          '2': { label: 'Busy', color: 'text-yellow-600', bgColor: 'bg-yellow-500' },     // busy
+          '3': { label: 'Offline', color: 'text-gray-500', bgColor: 'bg-gray-400' }        // offline
+        };
+
+        const status = statusMap[String(value)] || statusMap['3'];
+
+        return (
+          <div className="flex items-center space-x-2">
+            <div className={`w-2 h-2 rounded-full ${status.bgColor}`}></div>
+            <span className={`text-sm ${status.color}`}>
+              {status.label}
+            </span>
+          </div>
+        );
+      }
     },
-    { key: "gender", label: "Gender" },
+    {
+      key: "gender",
+      label: "Gender",
+      render: (value: unknown): React.ReactNode => {
+        return value as string;
+      }
+    },
     {
       key: "assignmentStatus",
       label: "Assignment Status",
@@ -182,10 +190,10 @@ export default function PaidStaff() {
           className="border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white text-black font-poppins focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
         >
           <option value="">Status</option>
-          <option value="online">Online</option>
-          <option value="in_chat">In Chat</option>
-          <option value="busy">Busy</option>
-          <option value="offline">Offline</option>
+          <option value="0">Online</option>
+          <option value="1">In Chat</option>
+          <option value="2">Busy</option>
+          <option value="3">Offline</option>
         </select>
 
         <select

@@ -36,7 +36,6 @@ export default function SortableSequenceItem({
     transition,
     opacity: isDragging ? 0.5 : 1,
   };
-
   return (
     <div
       ref={setNodeRef}

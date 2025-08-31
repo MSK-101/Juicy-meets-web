@@ -17,44 +17,30 @@ export interface WebRTCSignal {
   connectionId?: string; // Connection session ID
 }
 
-interface PubNubPresenceEvent {
-  action: 'join' | 'leave' | 'timeout' | 'state-change';
-  channel: string;
-  uuid: string;
-  timestamp: number;
-  occupancy: number;
-}
+// New robust signaling types based on the demo
+type Signal =
+  | { type: 'hello' | 'ready' | 'bye' | 'reset' | 'health'; matchId: string; sessionVersion: string; from: string; to?: string; role: 'initiator'|'receiver'; correlationId: string; ts: number; }
+  | { type: 'offer' | 'answer'; matchId: string; sessionVersion: string; from: string; to: string; role: 'initiator'|'receiver'; sdp: string; correlationId: string; ts: number; }
+  | { type: 'ice'; matchId: string; sessionVersion: string; from: string; to: string; role: 'initiator'|'receiver'; candidate: RTCIceCandidateInit; correlationId: string; ts: number; };
 
-interface PubNubMessageEvent {
-  channel: string;
-  subscription?: string;
-  timetoken: string;
-  message: unknown;
-  publisher: string;
-  uuid: string;
-}
-
-interface WebRTCMessage {
-  type: 'offer' | 'answer' | 'ice-candidate';
-  data: RTCSessionDescriptionInit | RTCIceCandidateInit;
-  from: string;
-  chatId: string;
-  connectionId?: string;
-}
-
-interface PresenceSyncMessage {
-  type: 'presence-sync' | 'presence-sync-request' | 'presence-sync-response';
-  userId: string;
-}
+type Handlers = {
+  onMessage: (msg: Signal) => void;
+  onJoin?: () => void;
+  onLeave?: () => void;
+  onError?: (e: unknown) => void;
+};
 
 class PubNubService {
-  private pubnub: PubNub | null = null;
-  private currentUser: string | null = null;
-  private currentChatId: string | null = null;
+  private client: PubNub | null = null;
+  private channel?: string;
+  private handlers?: Handlers;
+  private seen = new Set<string>();
+  private seenQueue: string[] = [];
+  private myUserId!: string;
+  private matchId?: string;
+  private sessionVersion = '';
   private isClient: boolean = false;
   private isInitialized: boolean = false;
-  private onlineUsers: Set<string> = new Set();
-  private presenceCallbacks: ((users: string[]) => void)[] = [];
 
   constructor() {
     this.isClient = typeof window !== 'undefined';
@@ -85,7 +71,7 @@ class PubNubService {
         return;
       }
 
-      this.pubnub = new PubNub({
+      this.client = new PubNub({
         publishKey: publishKey,
         subscribeKey: subscribeKey,
         uuid: `user-${Date.now()}`,
@@ -97,243 +83,174 @@ class PubNubService {
     }
   }
 
-  // Sanitize channel name for PubNub compatibility
-  private sanitizeChannelName(chatId: string): string {
-    // PubNub channel names must be:
-    // - 1-92 characters long
-    // - Only alphanumeric, hyphens, underscores, and periods
-    // - Cannot start with a number
+  // Join a video chat session with proper session versioning
+  join(matchId: string, sessionVersion: string, myUserId: string, handlers: Handlers) {
+    this.leave(); // defensive cleanup
+    this.matchId = matchId;
+    this.sessionVersion = sessionVersion;
+    this.myUserId = myUserId;
+    this.handlers = handlers;
+    this.channel = `vc.${matchId}`;
 
-    let sanitized = chatId
-      .replace(/[^a-zA-Z0-9\-_\.]/g, '') // Remove invalid characters
-      .substring(0, 20); // Limit length to 20 chars
+    console.log('🔌 PubNub: Joining channel:', this.channel, 'with session version:', sessionVersion);
 
-    // Ensure it doesn't start with a number
-    if (/^\d/.test(sanitized)) {
-      sanitized = 'room-' + sanitized;
-    }
+    this.client?.addListener({
+      message: (evt) => {
+        try {
+          const msg = evt.message as Signal;
+          if (!this.isValid(msg)) return;
+          if (this.isStale(msg)) return;
+          if (this.isDup(msg.correlationId)) return;
+          handlers.onMessage(msg);
+        } catch (e) {
+          handlers.onError?.(e);
+        }
+      },
+      status: (s) => {
+        if (s.category === 'PNConnectedCategory') handlers.onJoin?.();
+        if (s.category === 'PNNetworkIssuesCategory') handlers.onError?.(s);
+      },
+    });
 
-    // Ensure it's not empty
-    if (!sanitized) {
-      sanitized = 'default-room';
-    }
-
-    return sanitized;
+    this.client?.subscribe({ channels: [this.channel] });
   }
 
-  async connect(userId: string, chatId: string): Promise<void> {
-    if (!this.pubnub) {
-      console.error('❌ PubNub not initialized');
+  // Leave current session and cleanup
+  leave() {
+    if (this.channel) {
+      this.client?.unsubscribe({ channels: [this.channel] });
+    }
+    this.channel = undefined;
+    this.matchId = undefined;
+    this.sessionVersion = '';
+    this.handlers?.onLeave?.();
+    this.handlers = undefined;
+    this.seen.clear();
+    this.seenQueue = [];
+  }
+
+  // Send signal with proper session versioning and correlation IDs
+  send(partial: Omit<Signal, 'correlationId' | 'ts'>) {
+    if (!this.channel) throw new Error('Not joined to a channel');
+    const msg: Signal = { ...partial, correlationId: this.generateCorrelationId(), ts: Date.now() } as Signal;
+    return this.client?.publish({ channel: this.channel, message: msg });
+  }
+
+  // Send WebRTC offer
+  async sendOffer(to: string, role: 'initiator' | 'receiver', sdp: string): Promise<void> {
+    if (!this.client) {
+      console.warn('⚠️ PubNub not available, skipping offer signal');
       return;
     }
 
     try {
-      this.currentUser = userId;
-      this.currentChatId = chatId;
-
-      console.log('🔌 PubNub: Connecting user', userId, 'to chat', chatId);
-
-      // Sanitize channel names for PubNub compatibility
-      const sanitizedChatId = this.sanitizeChannelName(chatId);
-      const chatChannel = `chat-${sanitizedChatId}`;
-      const presenceChannel = `presence-${sanitizedChatId}`;
-
-      console.log('📡 PubNub: Subscribing to sanitized channels:', [chatChannel, presenceChannel]);
-      console.log('📝 Original chatId:', chatId, '→ Sanitized:', sanitizedChatId);
-
-      await this.pubnub.subscribe({
-        channels: [chatChannel, presenceChannel],
-        channelGroups: [],
-        withPresence: true
+      await this.send({
+        type: 'offer',
+        matchId: this.matchId!,
+        sessionVersion: this.sessionVersion,
+        from: this.myUserId,
+        to,
+        role,
+        sdp
       });
-
-      console.log('✅ PubNub: Subscribed to channels successfully');
-
-      // Set presence state immediately after subscription
-      console.log('👤 PubNub: Setting presence state for user:', userId);
-      if (this.pubnub) {
-        await this.pubnub.setState({
-          state: { status: 'online', chatId: chatId, timestamp: Date.now() },
-          channels: [presenceChannel]
-        });
-        console.log('✅ PubNub: Presence state set successfully');
-      }
-
-      // Wait for presence state to propagate
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      console.log('⏳ Waited for presence state propagation');
-
-      // Add current user to local tracking
-      this.onlineUsers.add(userId);
-      console.log('✅ PubNub connection completed successfully');
-      console.log('🔍 PubNub: Final state after connection:');
-      console.log('  - currentUser:', this.currentUser);
-      console.log('  - currentChatId:', this.currentChatId);
-      console.log('  - onlineUsers:', Array.from(this.onlineUsers));
-
-      // Set up presence listener
-      if (this.pubnub) {
-        this.pubnub.addListener({
-          presence: (presenceEvent: PubNubPresenceEvent) => {
-            console.log('👥 Presence event details:', presenceEvent);
-
-            if (presenceEvent.action === 'state-change') {
-              console.log('🔄 User state changed in channel:', presenceEvent.channel);
-
-              // Update local tracking
-              if (presenceEvent.uuid && presenceEvent.uuid !== this.currentUser) {
-                this.onlineUsers.add(presenceEvent.uuid);
-                console.log('➕ Added user to online list:', presenceEvent.uuid);
-              }
-            } else if (presenceEvent.action === 'join') {
-              console.log('👋 User joined:', presenceEvent.uuid);
-              if (presenceEvent.uuid !== this.currentUser) {
-                this.onlineUsers.add(presenceEvent.uuid);
-              }
-            } else if (presenceEvent.action === 'leave') {
-              console.log('👋 User left:', presenceEvent.uuid);
-              this.onlineUsers.delete(presenceEvent.uuid);
-            } else if (presenceEvent.action === 'timeout') {
-              console.log('⏰ User timed out:', presenceEvent.uuid);
-              this.onlineUsers.delete(presenceEvent.uuid);
-            }
-
-            // Notify subscribers of presence change
-            this.notifyPresenceChange();
-          },
-          message: (messageEvent: PubNubMessageEvent) => {
-            console.log('📨 PubNub message received:', messageEvent);
-            const message = messageEvent.message as WebRTCMessage | PresenceSyncMessage | unknown;
-
-            console.log('📨 Message details:', {
-              channel: messageEvent.channel,
-              messageType: (message as WebRTCMessage | PresenceSyncMessage)?.type,
-              currentUser: this.currentUser,
-              currentChatId: this.currentChatId
-            });
-
-            // Skip WebRTC signals - they're handled by the WebRTC signal listener
-            if (message && typeof message === 'object' && 'type' in message) {
-              const typedMessage = message as WebRTCMessage | PresenceSyncMessage;
-              if (typedMessage.type === 'offer' ||
-                  typedMessage.type === 'answer' ||
-                  typedMessage.type === 'ice-candidate') {
-                console.log('🔄 Skipping WebRTC signal - handled by WebRTC listener');
-                return;
-              }
-            }
-
-            // Handle presence sync messages
-            const msg = messageEvent.message as any;
-            if (messageEvent.channel === presenceChannel && msg?.type === 'presence-sync') {
-              const syncUserId = msg.userId;
-              console.log('🔄 Processing presence sync message from user:', syncUserId);
-              if (syncUserId && syncUserId !== this.currentUser) {
-                console.log('🔄 Presence sync message from user:', syncUserId);
-                this.onlineUsers.add(syncUserId);
-                console.log('➕ Added user to online list via sync:', syncUserId);
-                console.log('👥 Updated online users:', Array.from(this.onlineUsers));
-                this.notifyPresenceChange();
-              } else {
-                console.log('⚠️ Ignoring sync message from self or invalid user');
-              }
-            }
-
-            // Handle presence sync requests
-            if (messageEvent.channel === presenceChannel && msg?.type === 'presence-sync-request') {
-              const requestUserId = msg.userId;
-              console.log('🔄 Processing presence sync request from user:', requestUserId);
-
-              if (requestUserId && requestUserId !== this.currentUser) {
-                console.log('🔄 Responding to presence sync request from:', requestUserId);
-
-                // Send our presence info back to the requesting user
-                if (this.pubnub) {
-                  this.pubnub.publish({
-                    channel: presenceChannel,
-                    message: {
-                      type: 'presence-sync-response',
-                      userId: this.currentUser,
-                      chatId: this.currentChatId,
-                      timestamp: Date.now()
-                    }
-                  }).then(() => {
-                    console.log('✅ Sent presence sync response to:', requestUserId);
-
-                    // Also add the requesting user to our list
-                    this.onlineUsers.add(requestUserId);
-                    console.log('➕ Added requesting user to online list:', requestUserId);
-                    this.notifyPresenceChange();
-                  }).catch((error) => {
-                    console.error('❌ Error sending presence sync response:', error);
-                  });
-                }
-              }
-            }
-
-            // Handle presence sync responses
-            if (messageEvent.channel === presenceChannel && msg?.type === 'presence-sync-response') {
-              const responseUserId = msg.userId;
-              console.log('🔄 Processing presence sync response from user:', responseUserId);
-
-              if (responseUserId && responseUserId !== this.currentUser) {
-                console.log('🔄 Presence sync response from user:', responseUserId);
-                this.onlineUsers.add(responseUserId);
-                console.log('➕ Added user to online list via sync response:', responseUserId);
-                console.log('👥 Updated online users:', Array.from(this.onlineUsers));
-                this.notifyPresenceChange();
-              }
-            }
-
-            // Handle presence announce messages
-            if (messageEvent.channel === presenceChannel && msg?.type === 'presence-announce') {
-              const announceUserId = msg.userId;
-              console.log('📢 Processing presence announce message from user:', announceUserId);
-              if (announceUserId && announceUserId !== this.currentUser) {
-                console.log('📢 Presence announce from user:', announceUserId);
-                this.onlineUsers.add(announceUserId);
-                console.log('➕ Added user to online list via announce:', announceUserId);
-                console.log('👥 Updated online users:', Array.from(this.onlineUsers));
-                this.notifyPresenceChange();
-              } else {
-                console.log('⚠️ Ignoring announce message from self or invalid user');
-              }
-            }
-          }
-        });
-      }
-
-      // Announce presence to other users
-      await this.announcePresence();
-
+      console.log('📤 Offer signal sent successfully');
     } catch (error) {
-      console.error('💥 Error connecting to PubNub:', error);
-      // Reset state on error
-      this.currentUser = null;
-      this.currentChatId = null;
-      throw error;
+      console.error('❌ Failed to send offer signal:', error);
+      throw error; // Offer failure is critical
     }
   }
 
-  disconnect() {
-    if (!this.isClient || !this.isInitialized || !this.pubnub || !this.currentChatId) return;
+  // Send WebRTC answer
+  async sendAnswer(to: string, role: 'initiator' | 'receiver', sdp: string): Promise<void> {
+    if (!this.client) {
+      console.warn('⚠️ PubNub not available, skipping answer signal');
+      return;
+    }
 
-    // Set offline status
-    this.pubnub.setState({
-      channels: [this.getPresenceChannel(this.currentChatId)],
-      state: {
-        status: 'offline',
-        lastSeen: Date.now(),
-      },
-    });
+    try {
+      await this.send({
+        type: 'answer',
+        matchId: this.matchId!,
+        sessionVersion: this.sessionVersion,
+        from: this.myUserId,
+        to,
+        role,
+        sdp
+      });
+      console.log('📤 Answer signal sent successfully');
+    } catch (error) {
+      console.error('❌ Failed to send answer signal:', error);
+      throw error; // Answer failure is critical
+    }
+  }
 
-    // Unsubscribe from channels
-    this.pubnub.unsubscribe({
-      channels: [this.getChatChannel(this.currentChatId), this.getPresenceChannel(this.currentChatId)],
-    });
+  // Send ICE candidate
+  async sendIceCandidate(to: string, role: 'initiator' | 'receiver', candidate: RTCIceCandidateInit): Promise<void> {
+    if (!this.client) {
+      console.warn('⚠️ PubNub not available, skipping ICE candidate signal');
+      return;
+    }
 
-    this.currentUser = null;
-    this.currentChatId = null;
+    try {
+      await this.send({
+        type: 'ice',
+        matchId: this.matchId!,
+        sessionVersion: this.sessionVersion,
+        from: this.myUserId,
+        to,
+        role,
+        candidate
+      });
+      console.log('🧊 ICE candidate signal sent successfully');
+    } catch (error) {
+      console.error('❌ Failed to send ICE candidate signal:', error);
+      // ICE failures are not critical, just log
+    }
+  }
+
+  // Send handshake signals for connection establishment
+  async sendHello(to: string, role: 'initiator' | 'receiver'): Promise<void> {
+    if (!this.client) {
+      console.warn('⚠️ PubNub not available, skipping hello signal');
+      return;
+    }
+
+    try {
+      await this.send({
+        type: 'hello',
+        matchId: this.matchId!,
+        sessionVersion: this.sessionVersion,
+        from: this.myUserId,
+        to,
+        role
+      });
+      console.log('👋 Hello signal sent successfully');
+    } catch (error) {
+      console.error('❌ Failed to send hello signal:', error);
+      // Don't throw - allow fallback behavior
+    }
+  }
+
+  async sendReady(to: string, role: 'initiator' | 'receiver'): Promise<void> {
+    if (!this.client) {
+      console.warn('⚠️ PubNub not available, skipping ready signal');
+      return;
+    }
+
+    try {
+      await this.send({
+        type: 'ready',
+        matchId: this.matchId!,
+        sessionVersion: this.sessionVersion,
+        from: this.myUserId,
+        to,
+        role
+      });
+      console.log('✅ Ready signal sent successfully');
+    } catch (error) {
+      console.error('❌ Failed to send ready signal:', error);
+      // Don't throw - allow fallback behavior
+    }
   }
 
   // Send chat message
@@ -343,554 +260,74 @@ class PubNubService {
       return;
     }
 
-    if (!this.pubnub || !this.currentChatId || !this.currentUser) {
+    if (!this.client || !this.channel || !this.myUserId) {
       throw new Error('Not connected to chat');
     }
 
     const message: ChatMessage = {
       id: `${Date.now()}-${Math.random()}`,
       text,
-      sender: this.currentUser,
+      sender: this.myUserId,
       timestamp: Date.now(),
       type: 'text',
     };
 
-    await this.pubnub.publish({
-      channel: this.getChatChannel(this.currentChatId),
-      message,
+    await this.client.publish({
+      channel: this.channel,
+      message: message,
     });
   }
 
-  // Send custom chat message with custom format
-  async sendCustomMessage(messageData: { text: string; from: string; timestamp: number }): Promise<void> {
-    if (!this.isClient || !this.isInitialized) {
-      console.log('PubNub not available on server side');
-      return;
-    }
-
-    if (!this.pubnub || !this.currentChatId) {
-      throw new Error('Not connected to chat');
-    }
-
-    const message = {
-      type: 'chat-message',
-      data: messageData,
-      from: messageData.from,
-      chatId: this.currentChatId
-    };
-
-    try {
-      await this.pubnub.publish({
-        channel: this.getChatChannel(this.currentChatId),
-        message,
-      });
-      console.log('✅ Custom chat message sent via PubNub');
-    } catch (error) {
-      console.error('❌ Error sending custom chat message:', error);
-      throw error;
-    }
+  // Legacy methods for backward compatibility
+  async connect(_userId: string, _chatId: string): Promise<void> {
+    // This is now handled by the join method
+    console.warn('⚠️ connect() is deprecated, use join() instead');
   }
 
-  // Send WebRTC signal to specific user in chat
-  async sendWebRTCSignal(signal: {
-    type: 'offer' | 'answer' | 'ice-candidate';
-    data: RTCSessionDescriptionInit | RTCIceCandidateInit;
-    from: string;
-    to: string;
-    chatId: string;
-  }): Promise<void> {
-    if (!this.pubnub || !this.currentChatId) {
-      console.error('❌ PubNub not available or not connected to chat');
-      return;
-    }
-
-    try {
-      // Use sanitized channel name
-      const sanitizedChatId = this.sanitizeChannelName(signal.chatId);
-      const chatChannel = `chat-${sanitizedChatId}`;
-
-      console.log(`📡 PubNub: Sending WebRTC ${signal.type} signal to channel:`, chatChannel);
-      console.log(`📤 Signal details:`, {
-        type: signal.type,
-        from: signal.from,
-        to: signal.to,
-        chatId: signal.chatId,
-        sanitizedChatId: sanitizedChatId
-      });
-
-      const message = {
-        type: signal.type,
-        data: signal.data,
-        from: signal.from,
-        chatId: signal.chatId,
-        connectionId: `${signal.from}-${signal.to}-${Date.now()}`
-      };
-
-      await this.pubnub.publish({
-        channel: chatChannel,
-        message: message
-      });
-
-      console.log(`✅ WebRTC ${signal.type} signal sent successfully via PubNub`);
-    } catch (error) {
-      console.error(`❌ Failed to send WebRTC ${signal.type} signal:`, error);
-      throw error;
-    }
+  disconnect() {
+    this.leave();
   }
 
-  // Listen to messages
-  onMessage(callback: (message: unknown) => void) {
-    if (!this.isClient || !this.isInitialized || !this.pubnub) {
-      return () => {};
-    }
-
-    const listener = {
-      message: (event: PubNubMessageEvent) => {
-        console.log('📨 PubNub message received:', event);
-        // Pass the entire message to the callback
-        callback(event.message);
-      },
-    };
-
-    this.pubnub.addListener(listener);
-    return () => this.pubnub?.removeListener(listener);
+  // Validation methods
+  private isValid(msg: unknown): msg is Signal {
+    if (!msg || typeof msg !== 'object') return false;
+    const signal = msg as Signal;
+    return typeof signal.type === 'string' &&
+           typeof signal.matchId === 'string' &&
+           typeof signal.sessionVersion === 'string';
   }
 
-  // Listen to WebRTC signals
-  onWebRTCSignal(callback: (signal: WebRTCSignal) => void) {
-    if (!this.isClient || !this.isInitialized || !this.pubnub) {
-      return () => {};
-    }
-
-    const listener = {
-      message: (event: PubNubMessageEvent) => {
-        console.log('🔗 PubNub WebRTC signal received on channel:', event.channel);
-        console.log('🔍 Message content:', event.message);
-        const message = event.message as WebRTCMessage | unknown;
-
-        console.log('🔍 Message type check:', {
-          hasMessage: !!message,
-          messageType: message && typeof message === 'object' && 'type' in message ? (message as WebRTCMessage).type : 'unknown'
-        });
-
-        if (message && typeof message === 'object' && 'type' in message && 'data' in message) {
-          const webrtcMessage = message as WebRTCMessage;
-          if (webrtcMessage.type === 'offer' || webrtcMessage.type === 'answer' || webrtcMessage.type === 'ice-candidate') {
-            console.log('✅ Processing WebRTC signal:', webrtcMessage.type);
-            callback(webrtcMessage as WebRTCSignal);
-          } else {
-            console.log('⚠️ Unknown WebRTC message type:', webrtcMessage.type);
-          }
-        } else {
-          console.log('⚠️ Ignoring non-WebRTC message or invalid structure');
-        }
-      },
-    };
-
-    this.pubnub.addListener(listener);
-    return () => this.pubnub?.removeListener(listener);
+  private isStale(msg: Signal) {
+    return msg.matchId !== this.matchId || msg.sessionVersion !== this.sessionVersion;
   }
 
-  // Get online users in chat
-  async getOnlineUsers(): Promise<string[]> {
-    // Multiple safety checks to prevent SSR errors
-    if (!this.isClient || !this.isInitialized || !this.pubnub) {
-      console.log('❌ PubNub getOnlineUsers: Service not ready');
-      console.log('  - isClient:', this.isClient);
-      console.log('  - isInitialized:', this.isInitialized);
-      console.log('  - pubnub instance:', !!this.pubnub);
-      return [];
+  private isDup(id: string) {
+    if (this.seen.has(id)) return true;
+    this.seen.add(id);
+    this.seenQueue.push(id);
+    if (this.seenQueue.length > 500) { // small LRU
+      const old = this.seenQueue.shift()!;
+      this.seen.delete(old);
     }
-
-    // Check if currentChatId is set
-    if (!this.currentChatId) {
-      console.log('❌ PubNub getOnlineUsers: currentChatId not set');
-      console.log('  - currentChatId:', this.currentChatId);
-      console.log('  - currentUser:', this.currentUser);
-      return [];
-    }
-
-    // Additional check to ensure we're actually connected
-    if (!this.pubnub.getSubscribedChannels().length) {
-      console.log('❌ PubNub getOnlineUsers: No subscribed channels');
-      return [];
-    }
-
-    console.log('🔍 PubNub: Getting online users for chat:', this.currentChatId);
-    console.log('📡 Subscribed channels:', this.pubnub.getSubscribedChannels());
-
-    // Use local tracking as primary source
-    const localUsers = Array.from(this.onlineUsers);
-    console.log('👥 Local online users tracking:', localUsers);
-
-    // If we have other users locally, return them
-    if (localUsers.length > 1) {
-      console.log('✅ Multiple users found in local tracking');
-      return localUsers;
-    }
-
-    // If only self, try to discover other users
-    if (localUsers.length === 1 && localUsers[0] === this.currentUser) {
-      console.log('🔍 Only self detected, trying to discover other users...');
-
-      // Trigger a presence sync to discover other users
-      try {
-        await this.forcePresenceSync();
-
-        // Wait a bit for responses
-        await new Promise(resolve => setTimeout(resolve, 2000));
-
-        // Check local tracking again
-        const updatedLocalUsers = Array.from(this.onlineUsers);
-        console.log('👥 Updated local users after sync:', updatedLocalUsers);
-
-        if (updatedLocalUsers.length > 1) {
-          console.log('✅ Other users discovered via presence sync');
-          return updatedLocalUsers;
-        }
-      } catch (error) {
-        console.log('⚠️ Presence sync failed:', error);
-      }
-    }
-
-    // Fallback to hereNow() as last resort
-    try {
-      const presenceChannel = `presence-${this.currentChatId}`;
-      console.log('🔍 Checking presence channel:', presenceChannel);
-
-      const hereNowResult = await this.pubnub.hereNow({
-        channels: [presenceChannel],
-        includeState: true,
-      });
-
-      console.log('📊 PubNub hereNow result:', hereNowResult);
-
-      if (hereNowResult.channels && hereNowResult.channels[presenceChannel]) {
-        const channel = hereNowResult.channels[presenceChannel];
-        const hereNowUsers = Object.keys(channel.occupants || {});
-
-        console.log('👥 Actual online users from PubNub:', hereNowUsers);
-        console.log('👥 Channel occupancy:', channel.occupancy);
-
-        // Merge local and hereNow users, removing duplicates
-        const allUsers = new Set([...localUsers, ...hereNowUsers]);
-        const mergedUsers = Array.from(allUsers);
-
-        console.log('🔗 Merged online users (local + PubNub):', mergedUsers);
-        return mergedUsers;
-      } else {
-        console.log('⚠️ No channel data in hereNow result, using local tracking');
-        console.log('🔍 Available channels:', Object.keys(hereNowResult.channels || {}));
-        return localUsers;
-      }
-    } catch (error) {
-      console.error('💥 Error calling PubNub hereNow:', error);
-      // Fallback to local tracking
-      console.log('🔄 Falling back to local online users');
-      return localUsers;
-    }
+    return false;
   }
 
-  // Check for other users in the chat room
-  private checkForOtherUsers(chatId: string) {
-    if (!this.pubnub || !this.currentChatId) return;
-
-    try {
-      // Try to get users from the presence channel
-      this.pubnub.hereNow({
-        channels: [this.getPresenceChannel(chatId)],
-        includeState: true,
-      }).then((result) => {
-        console.log('🔍 Periodic presence check result:', result);
-
-        if (result.channels && result.channels[this.getPresenceChannel(chatId)]) {
-          const channel = result.channels[this.getPresenceChannel(chatId)];
-          const users = Object.keys(channel.occupants || {});
-
-          console.log('👥 Found users in periodic check:', users);
-
-          // Add any new users we found
-          users.forEach(userId => {
-            if (userId !== this.currentUser) {
-              this.onlineUsers.add(userId);
-              console.log('➕ Added user to online users:', userId);
-            }
-          });
-
-          if (users.length > 0) {
-            this.notifyPresenceChange();
-          }
-        }
-      }).catch((error) => {
-        console.log('⚠️ Periodic presence check failed:', error);
-      });
-    } catch (error) {
-      console.log('⚠️ Error in periodic presence check:', error);
-    }
-  }
-
-  // Notify presence change callbacks
-  notifyPresenceChange(): void {
-    if (!this.isClient || !this.isInitialized) return;
-
-    const currentUsers = Array.from(this.onlineUsers);
-    console.log('🔄 Notifying presence change, online users:', currentUsers);
-
-    // Call all registered callbacks
-    this.presenceCallbacks.forEach(callback => {
-      try {
-        callback(currentUsers);
-      } catch (error) {
-        console.error('💥 Error in presence change callback:', error);
-      }
-    });
-
-    // Also dispatch a custom event for immediate notification
-    if (typeof window !== 'undefined') {
-      const event = new CustomEvent('pubnub-presence-change', {
-        detail: { onlineUsers: currentUsers, chatId: this.currentChatId }
-      });
-      window.dispatchEvent(event);
-    }
-  }
-
-  // Listen to presence changes
-  onPresenceChange(callback: (presence: string[] | { onlineUsers: string[]; chatId: string }) => void) {
-    if (!this.isClient || !this.isInitialized || !this.pubnub) {
-      return () => {};
-    }
-
-    this.presenceCallbacks.push(callback);
-
-    const listener = {
-      presence: (event: Record<string, unknown>) => {
-        console.log('🔗 PubNub presence event received:', event);
-
-        // Extract user IDs from PubNub presence event
-        let userIds: string[] = [];
-
-        if (event.occupancy && event.occupants) {
-          // This is a presence event with occupancy info
-          const occupants = event.occupants as Record<string, unknown>;
-          userIds = Object.keys(occupants);
-        } else if (event.uuid) {
-          // This is a single user presence event
-          userIds = [event.uuid as string];
-        }
-
-        // Call the callback with consistent format
-        if (userIds.length > 0) {
-          callback(userIds);
-        }
-      },
-    };
-
-    this.pubnub.addListener(listener);
-    return () => {
-      this.pubnub?.removeListener(listener);
-      // Remove callback
-      const index = this.presenceCallbacks.indexOf(callback);
-      if (index > -1) {
-        this.presenceCallbacks.splice(index, 1);
-      }
-    };
-  }
-
-  // Manually trigger presence update to ensure visibility
-  async triggerPresenceUpdate(): Promise<void> {
-    if (!this.isClient || !this.isInitialized || !this.pubnub || !this.currentChatId || !this.currentUser) {
-      return;
-    }
-
-    try {
-      const presenceChannel = `presence-${this.currentChatId}`;
-
-      // Force a presence state update
-      await this.pubnub.setState({
-        state: {
-          status: 'online',
-          chatId: this.currentChatId,
-          timestamp: Date.now(),
-          lastUpdate: Date.now()
-        },
-        channels: [presenceChannel]
-      });
-
-      console.log('🔄 Manual presence update triggered for user:', this.currentUser);
-
-      // Wait a bit for the update to propagate
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      // Check if we're now visible
-      const hereNowResult = await this.pubnub.hereNow({
-        channels: [presenceChannel],
-        includeState: true,
-      });
-
-      if (hereNowResult.channels && hereNowResult.channels[presenceChannel]) {
-        const channel = hereNowResult.channels[presenceChannel];
-        console.log('✅ Presence update result - Channel occupancy:', channel.occupancy);
-        console.log('✅ Presence update result - Channel occupants:', Object.keys(channel.occupants || {}));
-      }
-    } catch (error) {
-      console.error('💥 Error triggering presence update:', error);
-    }
-  }
-
-  // Force presence sync to discover other users
-  async forcePresenceSync(): Promise<void> {
-    if (!this.isClient || !this.isInitialized || !this.pubnub || !this.currentUser || !this.currentChatId) {
-      console.log('❌ Cannot force presence sync - service not ready');
-      return;
-    }
-
-    try {
-      const presenceChannel = `presence-${this.currentChatId}`;
-      console.log('🔄 Forcing presence sync...');
-
-      // Send sync request
-      await this.pubnub.publish({
-        channel: presenceChannel,
-        message: {
-          type: 'presence-sync-request',
-          userId: this.currentUser,
-          chatId: this.currentChatId,
-          timestamp: Date.now()
-        }
-      });
-
-      console.log('✅ Presence sync request sent');
-
-      // Wait for responses
-      await new Promise(resolve => setTimeout(resolve, 2000));
-
-      // Check hereNow again
-      const hereNowResult = await this.pubnub.hereNow({
-        channels: [presenceChannel],
-        includeState: true
-      });
-
-      console.log('📊 HereNow after sync:', hereNowResult);
-
-      if (hereNowResult.channels && hereNowResult.channels[presenceChannel]) {
-        const channel = hereNowResult.channels[presenceChannel];
-        const hereNowUsers = Object.keys(channel.occupants || {});
-
-        console.log('👥 Users from hereNow after sync:', hereNowUsers);
-
-        // Add all users from hereNow to local tracking
-        hereNowUsers.forEach(userId => {
-          if (userId !== this.currentUser) {
-            this.onlineUsers.add(userId);
-            console.log('➕ Added user from hereNow:', userId);
-          }
-        });
-      }
-
-    } catch (error) {
-      console.error('❌ Error forcing presence sync:', error);
-    }
-  }
-
-  // Announce presence to other users
-  async announcePresence(): Promise<void> {
-    if (!this.isClient || !this.isInitialized || !this.pubnub || !this.currentUser || !this.currentChatId) {
-      console.log('❌ Cannot announce presence - service not ready');
-      return;
-    }
-
-    try {
-      const presenceChannel = `presence-${this.currentChatId}`;
-      console.log('📢 Announcing presence to channel:', presenceChannel);
-
-      // Send presence announce message
-      await this.pubnub.publish({
-        channel: presenceChannel,
-        message: {
-          type: 'presence-announce',
-          userId: this.currentUser,
-          chatId: this.currentChatId,
-          timestamp: Date.now()
-        }
-      });
-
-      console.log('✅ Presence announced successfully');
-
-      // Also send presence sync request to discover other users
-      await this.pubnub.publish({
-        channel: presenceChannel,
-        message: {
-          type: 'presence-sync-request',
-          userId: this.currentUser,
-          chatId: this.currentChatId,
-          timestamp: Date.now()
-        }
-      });
-
-      console.log('✅ Presence sync request sent');
-
-    } catch (error) {
-      console.error('❌ Error announcing presence:', error);
-    }
-  }
-
-  // Test method to check if presence system is working
-  async testPresenceSystem(): Promise<void> {
-    if (!this.isClient || !this.isInitialized || !this.pubnub || !this.currentChatId || !this.currentUser) {
-      console.log('❌ Cannot test presence system - missing required properties');
-      return;
-    }
-
-    try {
-      const presenceChannel = `presence-${this.currentChatId}`;
-      console.log('🧪 Testing presence system...');
-      console.log('🧪 Current user:', this.currentUser);
-      console.log('🧪 Current chat ID:', this.currentChatId);
-      console.log('🧪 Presence channel:', presenceChannel);
-      console.log('🧪 Local online users:', Array.from(this.onlineUsers));
-      console.log('🧪 Subscribed channels:', this.pubnub.getSubscribedChannels());
-
-      // Try to publish a test message
-      const testResult = await this.pubnub.publish({
-        channel: presenceChannel,
-        message: {
-          type: 'test-message',
-          userId: this.currentUser,
-          timestamp: Date.now(),
-          test: true
-        }
-      });
-
-      console.log('🧪 Test message published:', testResult);
-
-      // Check hereNow
-      const hereNowResult = await this.pubnub.hereNow({
-        channels: [presenceChannel],
-        includeState: true,
-      });
-
-      console.log('🧪 HereNow result:', hereNowResult);
-
-    } catch (error) {
-      console.error('💥 Error testing presence system:', error);
-    }
-  }
-
-  // Get sanitized chat channel name
-  getChatChannel(chatId: string): string {
-    const sanitizedChatId = this.sanitizeChannelName(chatId);
-    return `chat-${sanitizedChatId}`;
-  }
-
-  // Get sanitized presence channel name
-  getPresenceChannel(chatId: string): string {
-    const sanitizedChatId = this.sanitizeChannelName(chatId);
-    return `presence-${sanitizedChatId}`;
+  private generateCorrelationId(): string {
+    return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
   }
 
   // Check if running on client side
   isClientSide(): boolean {
     return this.isClient && this.isInitialized;
+  }
+
+  // Get current session info
+  getCurrentSession(): { matchId?: string; sessionVersion: string; channel?: string } {
+    return {
+      matchId: this.matchId,
+      sessionVersion: this.sessionVersion,
+      channel: this.channel
+    };
   }
 }
 

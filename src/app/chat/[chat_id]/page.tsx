@@ -13,6 +13,7 @@ import { VideoPlayer } from "@/components/VideoPlayer";
 import { userService } from "@/api/services/userService";
 import { coinDeductionService } from "@/services/coinDeductionService";
 import { nextSwipe } from "@/utils/swipeUtils";
+import { useAuthStore } from "@/store/auth";
 
 // Use imported ChatMessage interface
 
@@ -20,6 +21,9 @@ export default function VideoChatPage() {
   const params = useParams();
   const chatId = params.chat_id as string;
   const router = useRouter();
+
+  // Get user info from auth store
+  const user = useAuthStore((state) => state.user);
 
   // Start with empty chat
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -202,10 +206,31 @@ export default function VideoChatPage() {
 
       // Set up event listeners
       cleanVideoChatService.onRemoteStream((stream) => {
+        // Don't handle remote streams if we're playing a video
+        if (isVideoPlaying) {
+          console.log('🎥 Ignoring remote stream - currently playing video');
+          return;
+        }
+
+        console.log('🔗 Remote stream received for live connection');
         setRemoteStream(stream);
         setConnectionState('connected');
-        // NOTE: Don't clear video state here as it might interfere with video matches
-        // The video state will be managed separately by the video match handler
+
+        // Ensure local stream is still available for live connections
+        if (!localStream) {
+          console.log('🔍 Local stream missing, trying to get it again...');
+          try {
+            const currentLocalStream = cleanVideoChatService.getCurrentLocalStream();
+            if (currentLocalStream) {
+              setLocalStream(currentLocalStream);
+              console.log('✅ Local stream restored');
+            } else {
+              console.warn('⚠️ Could not restore local stream');
+            }
+          } catch (error) {
+            console.error('❌ Error getting local stream:', error);
+          }
+        }
 
         // Start tracking chat duration for coin deductions
         coinDeductionService.startChatDurationTracking();
@@ -214,13 +239,30 @@ export default function VideoChatPage() {
       // Set up video match event listener
       cleanVideoChatService.onVideoMatch((videoData) => {
         console.log('🎥 Video match event triggered:', videoData);
+        console.log('🎥 Current state before update:', {
+          isVideoPlaying,
+          currentVideoId,
+          currentVideoUrl,
+          currentVideoName
+        });
+
         setConnectionState('connected');
         setError(null);
-        // NOTE: Don't clear remoteStream here as it affects both panels
+
+        // Clear remote stream to prevent conflicts with video playback
+        setRemoteStream(null);
+
         setIsVideoPlaying(true);
         setCurrentVideoId(videoData.videoId);
         setCurrentVideoUrl(videoData.videoUrl);
         setCurrentVideoName(videoData.videoName);
+
+        console.log('🎥 State after update:', {
+          isVideoPlaying: true,
+          currentVideoId: videoData.videoId,
+          currentVideoUrl: videoData.videoUrl,
+          currentVideoName: videoData.videoName
+        });
 
         // Start new tracking for video
         coinDeductionService.startChatDurationTracking();
@@ -249,8 +291,24 @@ export default function VideoChatPage() {
       }
 
       cleanVideoChatService.onConnectionStateChange((state) => {
+        console.log('🔗 Connection state changed:', state);
+
         if (state === 'connected') {
           setConnectionState('connected');
+
+          // For live connections (not video), ensure local stream is available
+          if (!isVideoPlaying && !localStream) {
+            console.log('🔍 Live connection established but local stream missing, restoring...');
+            try {
+              const currentLocalStream = cleanVideoChatService.getCurrentLocalStream();
+              if (currentLocalStream) {
+                setLocalStream(currentLocalStream);
+                console.log('✅ Local stream restored for live connection');
+              }
+            } catch (error) {
+              console.error('❌ Error restoring local stream:', error);
+            }
+          }
         } else if (state === 'failed' || state === 'disconnected') {
           setConnectionState('failed');
         }
@@ -343,7 +401,7 @@ export default function VideoChatPage() {
     } finally {
       setIsConnecting(false);
     }
-  }, [chatId, isInitialized, isConnecting, isClient]);
+  }, [chatId, isInitialized, isConnecting, isClient, isVideoPlaying]);
 
   // Cleanup effect to stop tracking when component unmounts
   useEffect(() => {
@@ -530,6 +588,22 @@ export default function VideoChatPage() {
 
       {/* Main video chat interface */}
       <div className="w-full h-full flex flex-col md:flex-row items-stretch justify-stretch p-0">
+        {/* Sequence Progress Display */}
+        {user && (user.sequence_id || user.pool_id) && (
+          <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-30 bg-black/80 text-white px-4 py-2 rounded-lg text-sm">
+            <div className="flex items-center gap-4">
+              <span>Pool: {user.pool_id || 'N/A'}</span>
+              <span>Sequence: {user.sequence_id || 'N/A'}</span>
+              {user.videos_watched_in_current_sequence !== undefined && user.sequence_total_videos && (
+                <span>
+                  Progress: {user.videos_watched_in_current_sequence}/{user.sequence_total_videos}
+                  ({Math.round((user.videos_watched_in_current_sequence / user.sequence_total_videos) * 100)}%)
+                </span>
+              )}
+            </div>
+          </div>
+        )}
+
         <div
           className="gradient-border border md:border-[3px] w-full h-full flex flex-col md:flex-row overflow-hidden relative"
           onTouchStart={handleTouchStart}
@@ -539,24 +613,40 @@ export default function VideoChatPage() {
           {/* Left/User 1 - Remote User or Video */}
           <div className="h-[60%] md:flex-1 flex flex-col relative overflow-hidden md:h-full">
             <div className="w-full h-full">
-              {isVideoPlaying && currentVideoId ? (
-                <VideoPlayer
-                  videoId={currentVideoId}
-                  videoUrl={currentVideoUrl || undefined}
-                  videoName={currentVideoName || undefined}
-                  onVideoEnd={handleVideoEnd}
-                />
-              ) : (
-                <SplitVideoChat
-                  chatId={chatId}
-                  showRemote={true}
-                  localStream={null}
-                  remoteStream={remoteStream}
-                  connectionState={connectionState}
-                  isConnecting={isConnecting}
-                  error={error}
-                />
-              )}
+              {(() => {
+                console.log('🔍 Conditional rendering check:', {
+                  isVideoPlaying,
+                  currentVideoId,
+                  currentVideoUrl,
+                  currentVideoName,
+                  remoteStream: !!remoteStream
+                });
+
+                if (isVideoPlaying && currentVideoId) {
+                  console.log('🎥 Rendering VideoPlayer component');
+                  return (
+                    <VideoPlayer
+                      videoId={currentVideoId}
+                      videoUrl={currentVideoUrl || undefined}
+                      videoName={currentVideoName || undefined}
+                      onVideoEnd={handleVideoEnd}
+                    />
+                  );
+                } else {
+                  console.log('🔗 Rendering SplitVideoChat component (remote)');
+                  return (
+                    <SplitVideoChat
+                      chatId={chatId}
+                      showRemote={true}
+                      localStream={null}
+                      remoteStream={remoteStream}
+                      connectionState={connectionState}
+                      isConnecting={isConnecting}
+                      error={error}
+                    />
+                  );
+                }
+              })()}
 
               {/* Loading overlay when swiping */}
               {connectionState === 'connecting' && (

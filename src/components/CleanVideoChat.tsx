@@ -21,6 +21,33 @@ export const CleanVideoChat: React.FC = () => {
       }
     });
 
+    // Handle video matches (pre-recorded videos)
+    cleanVideoChatService.onVideoMatch((videoData) => {
+      console.log('🎥 Video match received:', videoData);
+
+      // For video matches, set the video URL directly on the remote video element
+      if (remoteVideoRef.current) {
+        console.log('🎥 Setting video URL on remote video element:', videoData.videoUrl);
+
+        // Clear any existing stream
+        remoteVideoRef.current.srcObject = null;
+
+        // Set the video URL directly
+        remoteVideoRef.current.src = videoData.videoUrl;
+        remoteVideoRef.current.load();
+
+        // Play the video
+        remoteVideoRef.current.play().then(() => {
+          console.log('✅ Video started playing successfully');
+          setStatus('connected');
+        }).catch(error => {
+          console.warn('⚠️ Could not autoplay video:', error);
+          // Still set status to connected even if autoplay fails
+          setStatus('connected');
+        });
+      }
+    });
+
     cleanVideoChatService.onConnectionStateChange((state) => {
       console.log('🔗 Connection state changed:', state);
       if (state === 'disconnected') {
@@ -89,6 +116,7 @@ export const CleanVideoChat: React.FC = () => {
       }
       if (remoteVideoRef.current) {
         remoteVideoRef.current.srcObject = null;
+        remoteVideoRef.current.src = ''; // Clear video URL as well
       }
     } catch (err) {
       console.error('❌ Failed to stop video chat:', err);

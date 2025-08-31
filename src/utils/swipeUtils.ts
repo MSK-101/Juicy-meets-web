@@ -1,5 +1,6 @@
 import { cleanVideoChatService } from "@/services/cleanVideoChatService";
 import { coinDeductionService } from "@/services/coinDeductionService";
+import { ChatMessage } from "@/components/ChatMessageContainer";
 
 export const nextSwipe = async (
   setConnectionState: (state: 'disconnected' | 'connecting' | 'connected' | 'failed') => void,
@@ -8,7 +9,7 @@ export const nextSwipe = async (
   setCurrentVideoId: (id: string | null) => void,
   setCurrentVideoUrl: (url: string | null) => void,
   setCurrentVideoName: (name: string | null) => void,
-  setMessages: (messages: any[]) => void
+  setMessages: (messages: ChatMessage[]) => void
 ) => {
   // Show loading immediately for instant feedback
   setConnectionState('connecting');
@@ -27,6 +28,27 @@ export const nextSwipe = async (
 
     const result = await cleanVideoChatService.swipeToNext();
     console.log('🔄 Swipe result:', result);
+
+    // Handle updated user info if provided
+    if (result.updatedUserInfo) {
+      console.log('🔍 Updating user info from swipe result:', result.updatedUserInfo);
+
+      // Import and update auth store
+      const { useAuthStore } = await import('../store/auth');
+      const authStore = useAuthStore.getState();
+
+      authStore.setSequenceInfo(
+        result.updatedUserInfo.sequence_id,
+        result.updatedUserInfo.videos_watched_in_current_sequence,
+        result.updatedUserInfo.sequence_total_videos
+      );
+
+      if (result.updatedUserInfo.pool_id) {
+        authStore.setPoolId(result.updatedUserInfo.pool_id);
+      }
+
+      console.log('✅ Auth store updated with new sequence info from swipe');
+    }
 
     if (result.success) {
       if (result.matchType === 'video') {
