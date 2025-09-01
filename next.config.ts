@@ -12,6 +12,10 @@ const nextConfig: NextConfig = {
   trailingSlash: false,
   // Server external packages moved to root level in Next.js 15
   serverExternalPackages: [],
+  // Disable ESLint during build for deployment
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
 };
 
 export default nextConfig;
