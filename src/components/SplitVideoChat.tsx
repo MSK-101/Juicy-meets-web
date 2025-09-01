@@ -172,7 +172,6 @@ export const SplitVideoChat: React.FC<SplitVideoChatProps> = ({
               playsInline
               muted={false}
               className="w-full h-full object-cover"
-              style={{ border: '2px solid red' }}
             />
             {/* Simple debug info */}
           </div>
