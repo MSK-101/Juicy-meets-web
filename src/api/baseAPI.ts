@@ -3,6 +3,10 @@ import { useErrorStore } from "@/store/error";
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api/v1";
 
+// Debug: Log the BASE_URL being used
+console.log('🔍 BASE_URL:', BASE_URL);
+console.log('🔍 NEXT_PUBLIC_API_URL env var:', process.env.NEXT_PUBLIC_API_URL);
+
 export class APIError extends Error {
   constructor(message: string, public status: number, public response?: unknown) {
     super(message);
@@ -27,7 +31,7 @@ export const apiRequest = async (
         token = storedToken;
         console.log('🔍 Retrieved token from localStorage');
       }
-    } catch (error) {
+    } catch {
       console.warn('Could not access localStorage for token');
     }
   }
@@ -47,7 +51,9 @@ export const apiRequest = async (
   console.log('🔍 Request headers:', config.headers);
 
   try {
-    const response = await fetch(`${BASE_URL}${endpoint}`, config);
+    const fullUrl = `${BASE_URL}${endpoint}`;
+    console.log('🔍 Making request to:', fullUrl);
+    const response = await fetch(fullUrl, config);
     const contentType = response.headers.get("content-type");
     const isJSON = contentType?.includes("application/json");
     const data = isJSON ? await response.json() : await response.text();
