@@ -5,13 +5,13 @@ const nextConfig: NextConfig = {
   // Heroku deployment optimizations
   output: 'standalone',
   experimental: {
-    // Disable features that might cause issues on Heroku
-    serverComponentsExternalPackages: [],
+    // Disable lightningcss to avoid binary loading issues
+    optimizeCss: false,
   },
   // Ensure proper static file handling
   trailingSlash: false,
-  // Optimize for production builds
-  swcMinify: true,
+  // Server external packages moved to root level in Next.js 15
+  serverExternalPackages: [],
 };
 
 export default nextConfig;
