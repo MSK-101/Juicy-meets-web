@@ -72,41 +72,45 @@ export const SplitVideoChat: React.FC<SplitVideoChatProps> = ({
       return;
     }
 
-    const assignStream = () => {
-      if (remoteVideoRef.current) {
-        console.log('📺 Setting remote stream on video element');
-        console.log('📺 Remote stream tracks:', remoteStream.getTracks().length);
+    // SIMPLE AND DIRECT: Just assign the stream immediately
+    if (remoteVideoRef.current && remoteStream) {
+      console.log('📺 Setting remote stream on video element');
+      console.log('📺 Remote stream tracks:', remoteStream.getTracks().length);
+      console.log('📺 Remote stream active:', remoteStream.active);
 
-        try {
-          remoteVideoRef.current.srcObject = remoteStream;
-          // Force video element to load
-          remoteVideoRef.current.load();
+      try {
+        // Direct assignment - no complex logic
+        remoteVideoRef.current.srcObject = remoteStream;
 
-          // Ensure video plays
-          remoteVideoRef.current.play().then(() => {
-            console.log('✅ Remote video started playing successfully');
-          }).catch(error => {
-            console.warn('⚠️ Could not autoplay remote video:', error);
-          });
+        // Force video to load and play
+        remoteVideoRef.current.load();
 
-          setHasRemoteStream(true);
-          return true;
-        } catch (error) {
-          console.error('❌ Error setting remote stream on video element:', error);
-          return false;
-        }
+        // Set state immediately
+        setHasRemoteStream(true);
+
+        // Force play after a short delay
+        setTimeout(() => {
+          if (remoteVideoRef.current) {
+            remoteVideoRef.current.play().catch(e =>
+              console.log('⚠️ Autoplay failed (normal):', e)
+            );
+          }
+        }, 100);
+
+        console.log('✅ Remote stream assigned successfully');
+        return;
+      } catch (error) {
+        console.error('❌ Error setting remote stream:', error);
+        setHasRemoteStream(false);
       }
-      return false;
-    };
-
-    // Try immediate assignment
-    if (assignStream()) {
-      return;
     }
 
-    // If video ref not ready, wait a bit and retry
+    // If video ref not ready, wait and retry once
     const retryTimeout = setTimeout(() => {
-      if (assignStream()) {
+      if (remoteVideoRef.current && remoteStream) {
+        console.log('📺 Retry: Setting remote stream on video element');
+        remoteVideoRef.current.srcObject = remoteStream;
+        setHasRemoteStream(true);
         console.log('✅ Remote stream assigned on retry');
       } else {
         console.log('❌ Failed to assign remote stream after retry');
@@ -119,6 +123,13 @@ export const SplitVideoChat: React.FC<SplitVideoChatProps> = ({
 
   // Update remote stream availability when stream changes
   useEffect(() => {
+    console.log('🔄 Remote stream changed:', {
+      hasStream: !!remoteStream,
+      streamActive: remoteStream?.active,
+      trackCount: remoteStream?.getTracks().length,
+      videoTracks: remoteStream?.getVideoTracks().length,
+      audioTracks: remoteStream?.getAudioTracks().length
+    });
     setHasRemoteStream(!!remoteStream);
   }, [remoteStream]);
 
@@ -159,8 +170,14 @@ export const SplitVideoChat: React.FC<SplitVideoChatProps> = ({
               ref={remoteVideoRef}
               autoPlay
               playsInline
+              muted={false}
               className="w-full h-full object-cover"
+              style={{ border: '2px solid red' }}
             />
+            {/* Simple debug info */}
+            <div className="absolute top-2 left-2 bg-red-500 text-white text-xs p-2 rounded">
+              Video: {remoteStream.getVideoTracks().length} | Audio: {remoteStream.getAudioTracks().length}
+            </div>
           </div>
         ) : (
           <div className="w-full h-full flex items-center justify-center bg-gray-800">

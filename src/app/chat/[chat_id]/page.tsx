@@ -109,7 +109,8 @@ export default function VideoChatPage() {
       setCurrentVideoId,
       setCurrentVideoUrl,
       setCurrentVideoName,
-      setMessages
+      setMessages,
+      setRemoteStream
     );
   };
 
@@ -315,17 +316,27 @@ export default function VideoChatPage() {
       });
 
       cleanVideoChatService.onPartnerLeft(() => {
+        console.log('👋 Partner left/swiped, preparing for new connection...');
+
+        // Clear current connection state
         setRemoteStream(null);
         setConnectionState('disconnected');
         setIsVideoPlaying(false);
         setCurrentVideoId(null);
         setCurrentVideoUrl(null);
         setCurrentVideoName(null);
+
         // Clear messages when partner leaves
         setMessages([]);
 
         // Stop tracking chat duration
         coinDeductionService.stopChatDurationTracking();
+
+        // Show connecting state to indicate we're looking for a new match
+        setConnectionState('connecting');
+        setIsConnecting(true);
+
+        console.log('🔄 Partner left, now looking for new match...');
       });
 
       // Set up message listener

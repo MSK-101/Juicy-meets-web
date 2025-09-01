@@ -9,7 +9,8 @@ export const nextSwipe = async (
   setCurrentVideoId: (id: string | null) => void,
   setCurrentVideoUrl: (url: string | null) => void,
   setCurrentVideoName: (name: string | null) => void,
-  setMessages: (messages: ChatMessage[]) => void
+  setMessages: (messages: ChatMessage[]) => void,
+  setRemoteStream?: (stream: MediaStream | null) => void
 ) => {
   // Show loading immediately for instant feedback
   setConnectionState('connecting');
@@ -22,6 +23,11 @@ export const nextSwipe = async (
     setCurrentVideoUrl(null);
     setCurrentVideoName(null);
     setMessages([]); // Clear messages for new match
+
+    // Clear remote stream state to prevent UI inconsistency
+    if (setRemoteStream) {
+      setRemoteStream(null);
+    }
 
     // Stop previous tracking
     coinDeductionService.stopChatDurationTracking();
@@ -81,8 +87,10 @@ export const nextSwipe = async (
       // Only show disconnected state if no match is found
       // Keep connecting state for a moment to show loading
       setTimeout(() => {
-        setConnectionState('disconnected');
-        setError('No match found');
+        setConnectionState('connecting');
+        setError(null);
+        // can we call next swipe here?
+        // setError('No match found');
       }, 2000); // Show loading for 2 seconds before showing "No match found"
     }
   } catch {
