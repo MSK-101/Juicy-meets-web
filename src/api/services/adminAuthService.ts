@@ -15,7 +15,18 @@ export interface AdminLoginRequest {
   password: string;
 }
 
+// Backend response structure
 export interface AdminLoginResponse {
+  success: boolean;
+  message: string;
+  data: {
+    admin: Admin;
+    token: string;
+  };
+}
+
+// Frontend expected structure (what we extract from backend)
+export interface AdminAuthData {
   admin: Admin;
   token: string;
 }
@@ -23,23 +34,51 @@ export interface AdminLoginResponse {
 // Service object with all admin auth-related API calls
 export const adminAuthService = {
   // Admin Authentication
-  login: async (credentials: AdminLoginRequest): Promise<AdminLoginResponse> => {
-    const response = await api.post("/admin/auth/login", credentials) as AdminLoginResponse;
-    console.log("Admin login response:", response);
+  login: async (credentials: AdminLoginRequest): Promise<AdminAuthData> => {
+    try {
+      const response = await api.post("/admin/auth/login", credentials) as AdminLoginResponse;
+      console.log("Admin login response:", response);
 
-    // Check if response has the expected structure
-    if (response && response.admin && response.token) {
-      return response;
-    } else {
-      console.error("Unexpected response format:", response);
-      throw new Error("Invalid response format from server");
+      // Check if response has the expected structure
+      if (response?.success && response?.data?.admin && response?.data?.token) {
+        return {
+          admin: response.data.admin,
+          token: response.data.token
+        };
+      } else {
+        console.error("Unexpected response format:", response);
+        throw new Error(response?.message || "Invalid response format from server");
+      }
+    } catch (error) {
+      console.error("Admin login error:", error);
+      throw error;
     }
   },
 
-  logout: (): Promise<void> => api.delete("/admin/auth/logout") as Promise<void>,
+  logout: async (): Promise<void> => {
+    try {
+      await api.delete("/admin/auth/logout");
+    } catch (error) {
+      console.error("Admin logout error:", error);
+      throw error;
+    }
+  },
 
-  getCurrentAdmin: async (): Promise<{ admin: Admin }> => {
-    const response = await api.get("/admin/auth/me") as { admin: Admin };
-    return response;
+  getCurrentAdmin: async (): Promise<Admin> => {
+    try {
+      const response = await api.get("/admin/auth/me") as {
+        success: boolean;
+        data: { admin: Admin };
+      };
+
+      if (response?.success && response?.data?.admin) {
+        return response.data.admin;
+      } else {
+        throw new Error("Failed to get current admin");
+      }
+    } catch (error) {
+      console.error("Get current admin error:", error);
+      throw error;
+    }
   },
 };
