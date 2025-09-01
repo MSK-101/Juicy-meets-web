@@ -155,7 +155,7 @@ export default function EditVideoPage({ params }: EditVideoPageProps) {
                  } catch (error: unknown) {
       console.error("Error updating video:", error);
       // Handle specific error messages from the API
-      if (error && typeof error === 'object' && 'response' in error && 
+      if (error && typeof error === 'object' && 'response' in error &&
           error.response && typeof error.response === 'object' && 'data' in error.response &&
           error.response.data && typeof error.response.data === 'object' && 'errors' in error.response.data) {
         const apiErrors = (error.response.data as any).errors;

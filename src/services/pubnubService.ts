@@ -53,12 +53,34 @@ class PubNubService {
 
   // Join a video chat room
   join(roomId: string, sessionVersion: string, myUserId: string, handlers: Handlers) {
-    // Only leave if we're joining a different room
-    if (this.channel && this.channel !== `vc.${roomId}`) {
-      this.leave(); // cleanup previous session only if different room
+    const newChannel = `vc.${roomId}`;
+
+    // CRITICAL FIX: Always leave previous channel completely before joining new one
+    if (this.channel && this.channel !== newChannel) {
+      console.log('🔄 Leaving previous channel:', this.channel, 'before joining:', newChannel);
+      this.leave(); // Complete cleanup of previous session
+
+      // Small delay to ensure cleanup is complete
+      setTimeout(() => this.joinNewChannel(newChannel, sessionVersion, myUserId, handlers), 100);
+      return;
     }
-    console.log('🔄 setting channel to', `vc.${roomId}`);
-    this.channel = `vc.${roomId}`;
+
+    // If same channel but different session, still reset
+    if (this.channel === newChannel && this.sessionVersion !== sessionVersion) {
+      console.log('🔄 Same room but different session version, resetting:', this.sessionVersion, '->', sessionVersion);
+      this.leave();
+      setTimeout(() => this.joinNewChannel(newChannel, sessionVersion, myUserId, handlers), 100);
+      return;
+    }
+
+    // Direct join for new connections
+    this.joinNewChannel(newChannel, sessionVersion, myUserId, handlers);
+  }
+
+  private joinNewChannel(channel: string, sessionVersion: string, myUserId: string, handlers: Handlers) {
+    console.log('🔄 Joining new channel:', channel, 'with session version:', sessionVersion);
+
+    this.channel = channel;
     this.sessionVersion = sessionVersion;
     this.myUserId = myUserId;
     this.handlers = handlers;
@@ -69,10 +91,22 @@ class PubNubService {
       console.log('🔌 PubNub: Joined channel', this.channel, 'with session version:', sessionVersion, 'as user', myUserId);
     }
 
+    // Remove existing listeners first to prevent duplicates
+    this.client?.removeAllListeners();
+
     this.client?.addListener({
       message: (evt) => {
         try {
           const msg = evt.message as WebRTCSignal;
+
+          console.log('📨 Raw PubNub message received:', {
+            type: msg.type,
+            from: msg.from,
+            to: msg.to,
+            myUserId: this.myUserId,
+            sessionVersion: msg.sessionVersion,
+            currentSessionVersion: this.sessionVersion
+          });
 
           // Skip our own messages
           if (msg.from === this.myUserId) {
@@ -83,17 +117,19 @@ class PubNubService {
           // Basic validation
           if (!msg || !msg.type || !msg.from || !msg.to) {
             console.warn('⚠️ Invalid message format:', msg);
-      return;
-    }
+            return;
+          }
 
           // Validate session version to prevent old messages from swipes
           if (msg.sessionVersion && msg.sessionVersion !== this.sessionVersion) {
             console.log('🔄 Skipping message with stale session version:', msg.sessionVersion, 'current:', this.sessionVersion);
-                return;
+            return;
           }
 
+          console.log('✅ PubNub message validation passed, forwarding to handler');
           handlers.onMessage(msg);
         } catch (e) {
+          console.error('❌ Error processing PubNub message:', e);
           handlers.onError?.(e);
         }
       },

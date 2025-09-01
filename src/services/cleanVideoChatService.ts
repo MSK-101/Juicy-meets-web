@@ -46,7 +46,7 @@ export class CleanVideoChatService {
   private signalCounter = 0; // Counter for unique signal IDs
 
   // Message buffering for proper ordering
-  private messageBuffer = new Map<string, any[]>();
+  private messageBuffer = new Map<string, unknown[]>();
   private processingMessages = false;
 
   // Connection health monitoring
@@ -54,6 +54,48 @@ export class CleanVideoChatService {
 
   constructor() {
     console.log('🎥 CleanVideoChatService initialized');
+
+    // Set up cleanup for page unload/refresh
+    this.setupPageUnloadHandler();
+  }
+
+  // Set up handler for page unload/refresh/tab close
+  private setupPageUnloadHandler(): void {
+    if (typeof window === 'undefined') return;
+
+    const handlePageUnload = (_event: BeforeUnloadEvent) => {
+      console.log('⚠️ Page unloading, cleaning up video chat...');
+
+      // Attempt to leave chat (may not complete due to page unload timing)
+      try {
+        // Use sendBeacon for more reliable cleanup during page unload
+        const userId = this.getAuthenticatedUserId();
+        const token = this.getAuthToken();
+
+        if (userId && token) {
+          navigator.sendBeacon('/api/v1/video_chat/leave', JSON.stringify({}));
+          console.log('📡 Sent leave beacon on page unload');
+        }
+      } catch (error) {
+        console.warn('⚠️ Could not send leave beacon:', error);
+      }
+
+      // Clean up local resources immediately
+      this.cleanup();
+    };
+
+    // Handle page unload/refresh
+    window.addEventListener('beforeunload', handlePageUnload);
+
+    // Handle tab close/navigation
+    window.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'hidden') {
+        console.log('📱 Tab/window hidden, user may be leaving...');
+        // Don't cleanup immediately as user might come back
+      }
+    });
+
+    console.log('✅ Page unload handlers set up');
   }
 
   private getAuthenticatedUserId(): string | null {
@@ -332,59 +374,61 @@ export class CleanVideoChatService {
       this.isSwiping = true;
       console.log('🔄 Starting swipe to next match...');
 
-      // Check if we're in an active connection before sending bye signal
-      const isInActiveConnection = this.currentRoomId &&
-                                  this.partnerId &&
-                                  this.partnerId !== 'video' &&
-                                  this.partnerId !== 'unknown' &&
-                                  pubnubService.isConnected();
+      // CRITICAL FIX: Complete cleanup BEFORE sending bye signal to prevent conflicts
+      console.log('🧹 Performing complete cleanup before bye signal...');
 
-      if (isInActiveConnection && this.partnerId) {
-        console.log('👋 Sending bye signal to partner before swipe...');
-          try {
-            await pubnubService.sendBye(this.partnerId);
-            console.log('✅ Bye signal sent successfully');
+      // Store current connection info before cleanup
+      const currentPartnerId = this.partnerId;
+      const wasInActiveConnection = this.currentRoomId &&
+                                   this.partnerId &&
+                                   this.partnerId !== 'video' &&
+                                   this.partnerId !== 'unknown' &&
+                                   pubnubService.isConnected();
 
-          // Wait a bit for the signal to be delivered
-          await new Promise(resolve => setTimeout(resolve, 500));
-        } catch (error) {
-          console.warn('⚠️ Failed to send bye signal:', error);
-          // Continue with swipe even if bye signal fails
-        }
-      } else {
-        console.log('ℹ️ No active connection to send bye signal, proceeding with swipe...');
-        if (this.currentRoomId) {
-          console.log('🔍 Debug info:', {
-            currentRoomId: this.currentRoomId,
-            partnerId: this.partnerId,
-            pubnubConnected: pubnubService.isConnected()
-          });
-        }
-      }
-
-      // Clear remote stream state to prevent UI inconsistency
-      // Note: We don't call the callback here since it expects a MediaStream
-      // The UI will be updated when the new match is processed
-
-      // Trigger partner left callback to show loader
+      // Trigger partner left callback to show loader immediately
       if (this.onPartnerLeftCallback) {
         this.onPartnerLeftCallback();
       }
 
-        // Perform comprehensive cleanup before requesting new match
-  console.log('🧹 Performing comprehensive cleanup for new match...');
-  this.performSwipeCleanup();
+      // Perform comprehensive cleanup FIRST
+      this.performSwipeCleanup();
 
-  // Additional state cleanup for signal tracking
-  this.processedSignals.clear();
-  this.signalCounter = 0;
-  this.messageBuffer.clear();
-  this.processingMessages = false;
+      // Additional state cleanup for signal tracking
+      this.processedSignals.clear();
+      this.signalCounter = 0;
+      this.messageBuffer.clear();
+      this.processingMessages = false;
+      this.isPubNubConnecting = false;
 
-    // Reset PubNub connection state
-  this.isPubNubConnecting = false;
+      // CRITICAL: Clear all connection identifiers to prevent cross-contamination
+      this.currentRoomId = null;
+      this.partnerId = null;
+      this.sessionVersion = null;
+      this.isInitiator = false;
+      this.hasSentReadySignal = false;
+      this.partnerReadyReceived = false;
 
-  console.log('✅ Signal tracking state cleared for new match');
+      console.log('✅ Complete state cleared for new match');
+
+      // NOW send bye signal with stored partner info (if we were connected)
+      if (wasInActiveConnection && currentPartnerId) {
+        console.log('👋 Sending bye signal to partner after cleanup:', currentPartnerId);
+        try {
+          // Use a fresh PubNub connection attempt for bye signal
+          const currentSession = pubnubService.getCurrentSession();
+          if (currentSession.channel && currentSession.userId) {
+            await pubnubService.sendBye(currentPartnerId);
+            console.log('✅ Bye signal sent successfully');
+          } else {
+            console.log('⚠️ No active PubNub session for bye signal, skipping');
+          }
+        } catch (error) {
+          console.warn('⚠️ Failed to send bye signal (normal after cleanup):', error);
+          // This is expected after cleanup, continue normally
+        }
+      } else {
+        console.log('ℹ️ No active connection to send bye signal, proceeding with swipe...');
+      }
 
       const response = await api.post('/video_chat/swipe', {});
       console.log('🔄 Raw response from backend:', response);
@@ -463,12 +507,35 @@ export class CleanVideoChatService {
         console.log('🔍 Set isInitiator:', this.isInitiator);
         console.log('🔍 Set sessionVersion:', this.sessionVersion);
 
-        // Handle the match based on its type
-        console.log('🔍 Processing match type:', responseData.match_type);
-        await this.handleMatchWithErrorHandling(responseData.match_type, responseData);
+        // CRITICAL FIX: Determine match type BEFORE processing to avoid conflicts
+        let actualMatchType = 'unknown';
 
-        // Return the match result
-        if (responseData.match_type === 'video') {
+        // Video match detection - prioritize video_id presence
+        if (responseData.video_id && responseData.video_url) {
+          actualMatchType = 'video';
+          console.log('🎥 Video match detected via video_id and video_url');
+        }
+        // Live connection detection - partner with real ID
+        else if (responseData.partner &&
+                 responseData.partner.id &&
+                 responseData.partner.id !== 'video' &&
+                 responseData.partner.id !== 'unknown') {
+          actualMatchType = responseData.match_type === 'staff' ? 'staff' : 'real_user';
+          console.log('🔗 Live connection detected:', actualMatchType, 'partner:', responseData.partner.id);
+        }
+        // Fallback based on match_type field
+        else {
+          actualMatchType = responseData.match_type || 'unknown';
+          console.log('⚠️ Using fallback match type detection:', actualMatchType);
+        }
+
+        console.log('🔍 Final match type determined:', actualMatchType);
+
+        // Handle the match based on its type
+        await this.handleMatchWithErrorHandling(actualMatchType, responseData);
+
+        // Return the match result based on actual type
+        if (actualMatchType === 'video') {
           return {
             success: true,
             roomId: responseData.room_id,
@@ -480,7 +547,7 @@ export class CleanVideoChatService {
             sessionVersion: responseData.session_version,
             updatedUserInfo: responseData.updated_user_info
           };
-        } else if (responseData.match_type === 'staff') {
+        } else if (actualMatchType === 'staff') {
           return {
             success: true,
             roomId: responseData.room_id,
@@ -489,8 +556,7 @@ export class CleanVideoChatService {
             sessionVersion: responseData.session_version,
             updatedUserInfo: responseData.updated_user_info
           };
-        } else {
-          // Real user match
+        } else if (actualMatchType === 'real_user') {
           return {
             success: true,
             roomId: responseData.room_id,
@@ -499,15 +565,46 @@ export class CleanVideoChatService {
             sessionVersion: responseData.session_version,
             updatedUserInfo: responseData.updated_user_info
           };
+        } else {
+          console.warn('⚠️ Unknown match type, treating as failed match');
+          return { success: false };
         }
       } else {
         // No match found - ensure we're in a clean state for the next attempt
         console.log('⚠️ No match found after swipe, ensuring clean state...');
 
+        // CRITICAL FIX: If no match found, restart status checking to wait for new matches
+        // This is especially important for staff users who need to wait for real app users
+        console.log('🔄 Restarting status checking to wait for new matches...');
+
+        // Make sure we're not already checking
+        if (this.statusCheckInterval) {
+          clearInterval(this.statusCheckInterval);
+          this.statusCheckInterval = null;
+        }
+
+        // Start status checking again to wait for matches
+        this.startStatusChecking();
+        console.log('✅ Status checking restarted after failed swipe');
+
         return { success: false };
       }
     } catch (error) {
       console.error('❌ Error during swipe:', error);
+
+      // CRITICAL FIX: Even on error, restart status checking so user doesn't get stuck
+      console.log('🔄 Restarting status checking after swipe error...');
+
+      // Make sure we're not already checking
+      if (this.statusCheckInterval) {
+        clearInterval(this.statusCheckInterval);
+        this.statusCheckInterval = null;
+      }
+
+      // Start status checking again
+      this.startStatusChecking();
+      console.log('✅ Status checking restarted after swipe error');
+
       return { success: false };
     } finally {
       // Reset swiping flag after a delay to prevent rapid swipes (only for live connections)
@@ -1334,17 +1431,23 @@ Your browser or device does not support camera access.
       console.log('📺 Remote track received:', event);
       console.log('📺 Streams count:', event.streams.length);
       console.log('📺 Track kind:', event.track.kind);
+      console.log('📺 Track readyState:', event.track.readyState);
+      console.log('📺 Track enabled:', event.track.enabled);
 
       if (event.streams && event.streams.length > 0) {
-      this.remoteStream = event.streams[0];
+        this.remoteStream = event.streams[0];
         console.log('✅ Remote stream set:', this.remoteStream);
         console.log('✅ Remote stream tracks:', this.remoteStream.getTracks().map(t => t.kind));
+        console.log('✅ Remote stream active:', this.remoteStream.active);
+        console.log('✅ Remote stream id:', this.remoteStream.id);
 
-      if (this.onRemoteStreamCallback) {
+        if (this.onRemoteStreamCallback) {
           console.log('📞 Calling onRemoteStreamCallback with stream');
-        this.onRemoteStreamCallback(this.remoteStream);
+          console.log('📞 Callback exists:', typeof this.onRemoteStreamCallback);
+          this.onRemoteStreamCallback(this.remoteStream);
+          console.log('✅ onRemoteStreamCallback called successfully');
         } else {
-          console.warn('⚠️ No onRemoteStreamCallback set');
+          console.warn('⚠️ No onRemoteStreamCallback set - UI will not receive stream!');
         }
 
         // Check remote stream status after setting it
@@ -1575,6 +1678,7 @@ Your browser or device does not support camera access.
     if (signalFromStr !== partnerIdStr) {
       console.log('⚠️ Ignoring signal from wrong partner. Expected:', partnerIdStr, 'Got:', signalFromStr);
       console.log('⚠️ Signal validation failed - partner ID mismatch');
+      console.log('🔍 Full signal details:', signal);
       return;
     }
 
@@ -1627,40 +1731,21 @@ Your browser or device does not support camera access.
     try {
       switch (signal.type) {
           case 'ready':
-          console.log('✅ Partner is ready for WebRTC connection');
-          console.log('🔍 Ready signal details:', {
-            from: signal.from,
-            to: signal.to,
-            sessionVersion: signal.sessionVersion,
-            currentSessionVersion: this.sessionVersion,
-            match: signal.sessionVersion === this.sessionVersion
-          });
-          console.log('🔍 Current user state:', {
-            isInitiator: this.isInitiator,
-            partnerId: this.partnerId,
-            currentRoomId: this.currentRoomId
-          });
-
-          // FIXED: Remove the duplicate signal check that was blocking ready signals
-          // The processedSignals check was preventing the handshake from completing
-
-          if (this.isInitiator) {
-            console.log('🎯 Initiator: Partner ready, creating offer...');
-            await this.createAndSendOffer();
-          } else {
-            console.log('⏳ Receiver: Partner ready, sending ready signal back to complete handshake...');
-            console.log('🔍 About to send ready signal to partner:', signal.from);
-            try {
-              await pubnubService.sendReady(signal.from);
-              console.log('✅ Ready signal sent to:', signal.from);
-            } catch (error) {
-              console.error('❌ Failed to send ready signal back:', error);
-            }
-          }
+          console.log('✅ Partner sent ready signal - ignoring (using simplified handshake)');
+          // We now use a simplified handshake where initiator starts immediately
+          // Ready signals are no longer needed for the handshake
           break;
         case 'offer':
           if (signal.sdp) {
             console.log('📥 Received offer from partner');
+            console.log('🔍 Offer details:', {
+              sdpLength: signal.sdp.length,
+              peerConnectionExists: !!this.peerConnection,
+              signalingState: this.peerConnection?.signalingState,
+              partnerId: this.partnerId,
+              signalFrom: signal.from
+            });
+
             // FIX: Ensure peer connection is in correct state for offer
             if (this.peerConnection && this.peerConnection.signalingState === 'stable') {
               console.log('🔄 Peer connection in stable state, resetting for offer...');
@@ -1668,6 +1753,8 @@ Your browser or device does not support camera access.
               await this.setupPeerConnectionOnly();
             }
             await this.handleOffer({ sdp: signal.sdp, type: 'offer' });
+          } else {
+            console.warn('⚠️ Received offer signal but no SDP data:', signal);
           }
           break;
         case 'answer':
@@ -1743,6 +1830,7 @@ Your browser or device does not support camera access.
 
   // Track if ready signal has been sent to prevent duplicates
   private hasSentReadySignal = false;
+  private partnerReadyReceived = false;
 
   // Track if WebRTC is being reset to prevent signal processing during reset
   private isWebRTCResetting = false;
@@ -1751,8 +1839,22 @@ Your browser or device does not support camera access.
 
   // Set up PubNub connection with session versioning
   private async setupPubNubConnection(): Promise<void> {
+    console.log('🔧 setupPubNubConnection called with data:', {
+      currentRoomId: this.currentRoomId,
+      partnerId: this.partnerId,
+      sessionVersion: this.sessionVersion,
+      hasCurrentRoomId: !!this.currentRoomId,
+      hasPartnerId: !!this.partnerId,
+      hasSessionVersion: !!this.sessionVersion
+    });
+
     if (!this.currentRoomId || !this.partnerId || !this.sessionVersion) {
       console.warn('⚠️ Cannot set up PubNub connection: missing room, partner, or session version info');
+      console.warn('⚠️ Missing data details:', {
+        currentRoomId: this.currentRoomId,
+        partnerId: this.partnerId,
+        sessionVersion: this.sessionVersion
+      });
       return;
     }
 
@@ -1790,6 +1892,16 @@ Your browser or device does not support camera access.
         {
           onMessage: (signal) => {
           console.log('📨 PubNub message received:', signal.type, 'from:', signal.from, 'to:', signal.to);
+          console.log('🔍 Message details:', {
+            type: signal.type,
+            from: signal.from,
+            to: signal.to,
+            sessionVersion: signal.sessionVersion,
+            currentPartnerId: this.partnerId,
+            currentUserId: userId,
+            hasSdp: !!(signal as any).sdp,
+            hasCandidate: !!(signal as any).candidate
+          });
           this.handleIncomingSignal(signal);
         },
           onJoin: () => this.handlePubNubJoin(),
@@ -1812,20 +1924,51 @@ Your browser or device does not support camera access.
     console.log('✅ Joined PubNub channel successfully');
 
     try {
-      // PROPER HANDSHAKE FLOW:
-      if (this.partnerId && this.isInitiator && !this.hasSentReadySignal) {
-        // Initiator: Send ready signal to start handshake (only once)
-        console.log('🎯 Initiator: Sending ready signal to partner to start handshake');
+      // BOTH users send ready signals to ensure proper synchronization
+      if (this.partnerId && !this.hasSentReadySignal) {
+        console.log('🎯 Sending ready signal to partner to ensure synchronization');
+        console.log('🔍 Ready signal state before sending:', {
+          hasSentReadySignal: this.hasSentReadySignal,
+          partnerId: this.partnerId,
+          sessionVersion: this.sessionVersion
+        });
+        this.hasSentReadySignal = true;
+
         await pubnubService.sendReady(this.partnerId);
-        this.hasSentReadySignal = true; // Mark as sent
         console.log('✅ Ready signal sent to partner');
-        console.log('⏳ Waiting for partner ready signal before creating offer...');
-      } else if (this.partnerId && !this.isInitiator) {
-        // Receiver: Wait for initiator's ready signal
-        console.log('⏳ Receiver: Waiting for initiator to send ready signal');
-        console.log('⏳ Waiting for offer from initiator...');
+
+        if (this.isInitiator) {
+          // Initiator: Wait a bit for partner to also join and send ready, then create offer
+          console.log('🎯 Initiator: Will create offer after ensuring partner readiness');
+          setTimeout(async () => {
+            try {
+              console.log('🎯 Initiator: Starting offer creation after readiness delay');
+              console.log('🔍 Pre-offer state:', {
+                partnerId: this.partnerId,
+                roomId: this.currentRoomId,
+                sessionVersion: this.sessionVersion,
+                hasPeerConnection: !!this.peerConnection
+              });
+              await this.createAndSendOffer();
+              console.log('✅ Initiator: Offer created and sent');
+            } catch (error) {
+              console.error('❌ Initiator: Failed to create offer:', error);
+            }
+          }, 5000); // 5 second delay to ensure proper synchronization
+        } else {
+          // Receiver: Just wait for offer
+          console.log('⏳ Receiver: Ready signal sent, waiting for offer from initiator...');
+        }
       } else if (this.hasSentReadySignal) {
         console.log('⚠️ Ready signal already sent, skipping duplicate');
+        console.log('🔍 Current state when skipping:', {
+          hasSentReadySignal: this.hasSentReadySignal,
+          partnerId: this.partnerId,
+          sessionVersion: this.sessionVersion,
+          isInitiator: this.isInitiator
+        });
+      } else {
+        console.log('⚠️ Cannot send ready signal - missing partnerId');
       }
     } catch (error) {
       console.error('❌ Error in PubNub join handling:', error);
@@ -2275,10 +2418,10 @@ Your browser or device does not support camera access.
 
       console.log('✅ Using existing peer connection for WebRTC connection');
 
-      // For the new handshake flow, we wait for the partner's ready signal
-      // The offer will be created and sent in createAndSendOffer() when ready is received
+      // Simplified flow: Initiator will create offer after PubNub join
+      // Receiver will wait for the offer
       if (this.isInitiator) {
-        console.log('⏳ Initiator: Waiting for partner ready signal before creating offer...');
+        console.log('🎯 Initiator: Will create offer after PubNub connection');
       } else {
         console.log('⏳ Receiver: Waiting for offer from initiator...');
       }
@@ -2351,8 +2494,24 @@ Your browser or device does not support camera access.
       } else if (matchData.partner && matchData.partner.id && matchData.partner.id !== 'video') {
         // Case 2: Live Connection (staff or real user) - Start WebRTC
         console.log('🔗 Live connection detected - starting WebRTC...');
-        console.log('🔗 Partner ID:', matchData.partner.id);
+
+        // CRITICAL: Set match data FIRST before any setup
+        console.log('🔧 Setting match data from response...');
+        this.currentRoomId = matchData.room_id;
+        this.partnerId = matchData.partner.id.toString();
+        this.isInitiator = matchData.is_initiator;
+        this.sessionVersion = matchData.session_version;
+
+        // CRITICAL FIX: Reset ready signal flag for fresh connection
+        // This prevents "already sent" issues when rematching with same partner
+        this.hasSentReadySignal = false;
+        this.partnerReadyReceived = false;
+        console.log('🔄 Reset ready signal flags for fresh connection');
+
+        console.log('🔗 Partner ID:', this.partnerId);
         console.log('🔗 Is Initiator:', this.isInitiator);
+        console.log('🔗 Room ID:', this.currentRoomId);
+        console.log('🔗 Session Version:', this.sessionVersion);
 
         // Verify we have a valid partner (not a ghost connection)
         if (matchData.partner.id === this.getAuthenticatedUserId()) {
@@ -2361,8 +2520,27 @@ Your browser or device does not support camera access.
 
           // Try to get a video match instead
           await this.requestVideoMatchFallback();
-      return;
-    }
+          return;
+        }
+
+        // CRITICAL: Verify all required data is set before proceeding
+        console.log('🔍 Validating required match data:', {
+          currentRoomId: this.currentRoomId,
+          partnerId: this.partnerId,
+          sessionVersion: this.sessionVersion,
+          hasCurrentRoomId: !!this.currentRoomId,
+          hasPartnerId: !!this.partnerId,
+          hasSessionVersion: !!this.sessionVersion
+        });
+
+        if (!this.currentRoomId || !this.partnerId || !this.sessionVersion) {
+          console.error('❌ Missing required match data!');
+          console.error('❌ matchData received:', matchData);
+          console.error('❌ Will attempt to proceed anyway for debugging...');
+          // Don't throw error, just log and continue for now
+        } else {
+          console.log('✅ All required match data validated successfully');
+        }
 
         await this.setupPubNubConnection();
 
@@ -2589,12 +2767,15 @@ Your browser or device does not support camera access.
       this.statusCheckInterval = null;
     }
 
-    // Clear callbacks
-    this.onRemoteStreamCallback = null;
-    this.onConnectionStateCallback = null;
-    this.onMessageReceivedCallback = null;
-    this.onVideoMatchCallback = null;
-    this.onPartnerLeftCallback = null;
+    // CRITICAL FIX: Don't clear UI callbacks during cleanup!
+    // These callbacks need to persist across connections so UI can receive streams
+    // Only clear them during complete service shutdown, not during normal cleanup
+    console.log('🔄 Preserving UI callbacks during cleanup for continuous operation');
+    // this.onRemoteStreamCallback = null;          // KEEP THIS
+    // this.onConnectionStateCallback = null;       // KEEP THIS
+    // this.onMessageReceivedCallback = null;       // KEEP THIS
+    // this.onVideoMatchCallback = null;            // KEEP THIS
+    // this.onPartnerLeftCallback = null;           // KEEP THIS
 
     // Reset state
     this.currentRoomId = null;
@@ -2662,18 +2843,30 @@ Your browser or device does not support camera access.
   // Handle partner left event
   private handlePartnerLeft(): void {
     console.log('👋 Partner is leaving/swiping, cleaning up connection...');
+    console.log('🔍 handlePartnerLeft called - starting cleanup and new match process');
 
     // Notify UI that partner left
     if (this.onPartnerLeftCallback) {
+      console.log('📞 Calling onPartnerLeftCallback...');
       this.onPartnerLeftCallback();
+    } else {
+      console.log('⚠️ No onPartnerLeftCallback registered');
     }
 
     // Clean up the current connection
+    console.log('🧹 Performing swipe cleanup...');
     this.performSwipeCleanup();
 
     // CRITICAL FIX: Force new match request after cleanup
     console.log('🔄 Forcing new match request after cleanup...');
-    this.forceNewMatchRequest();
+    setTimeout(async () => {
+      try {
+        await this.forceNewMatchRequest();
+        console.log('✅ Force new match request completed');
+      } catch (error) {
+        console.error('❌ Error in forceNewMatchRequest:', error);
+      }
+    }, 50); // Minimal delay to ensure cleanup is complete
   }
 
   // Check if currently swiping
@@ -2684,23 +2877,57 @@ Your browser or device does not support camera access.
   // Force new match request after cleanup
   private async forceNewMatchRequest(): Promise<void> {
     console.log('🔄 Forcing new match request...');
+    console.log('🔍 forceNewMatchRequest called - starting automatic match search');
 
     try {
       // Clear current state to ensure fresh match
+      console.log('🧹 Clearing current state for fresh match...');
       this.currentRoomId = null;
       this.partnerId = null;
       this.sessionVersion = null;
 
-      // Request new match from backend
-      const result = await this.swipeToNext();
+      // CRITICAL FIX: Instead of just calling swipeToNext(), we need to rejoin the queue
+      // This ensures the user gets a new VideoWaitingRoom entry and starts status checking
+      console.log('🎯 Rejoining queue to create new VideoWaitingRoom entry...');
 
-      if (result.success) {
-        console.log('✅ New match request successful');
-      } else {
-        console.log('⚠️ New match request failed, will retry via status checking');
+      // Add minimal delay to prevent immediate re-matching with same partner who also failed
+      console.log('⏱️ Adding minimal delay to prevent race conditions with partner rejoin...');
+      await new Promise(resolve => setTimeout(resolve, 200 + Math.random() * 300)); // 200-500ms random delay
+
+      try {
+        // Stop current status checking first
+        if (this.statusCheckInterval) {
+          clearInterval(this.statusCheckInterval);
+          this.statusCheckInterval = null;
+          console.log('🛑 Stopped status checking for rejoin');
+        }
+
+        // Rejoin the queue (this creates VideoWaitingRoom entry and starts status checking)
+        await api.post('/video_chat/join', {});
+        console.log('✅ Successfully rejoined video chat queue');
+
+        // Start checking for matches again
+        this.startStatusChecking();
+        console.log('✅ Status checking restarted - user should get new match automatically');
+
+      } catch (joinError) {
+        console.error('❌ Failed to rejoin queue, falling back to swipe method:', joinError);
+
+        // Fallback to the old method
+        console.log('🚀 Calling swipeToNext() as fallback...');
+        const result = await this.swipeToNext();
+        console.log('📊 Swipe result:', result);
+
+        if (result.success) {
+          console.log('✅ New match request successful - user should get new match');
+        } else {
+          console.log('⚠️ New match request failed, will retry via status checking');
+          console.log('❌ Failed result details:', result);
+        }
       }
     } catch (error) {
       console.error('❌ Error forcing new match request:', error);
+      console.error('❌ Error details:', error);
     }
   }
 
@@ -2938,13 +3165,24 @@ Your browser or device does not support camera access.
       // Clean up the failed connection
       this.resetWebRTCState();
 
-      // Trigger swipe to get a new match
+      // Trigger UI callback
       if (this.onPartnerLeftCallback) {
         console.log('👋 Triggering partner left callback for automatic swipe...');
         this.onPartnerLeftCallback();
       } else {
-        console.log('⚠️ No partner left callback available, cannot auto-swipe');
+        console.log('⚠️ No partner left callback available for UI update');
       }
+
+      // CRITICAL FIX: Also trigger the same rejoin logic as handlePartnerLeft
+      console.log('🔄 Triggering automatic rejoin after connection failure...');
+      setTimeout(async () => {
+        try {
+          await this.forceNewMatchRequest();
+          console.log('✅ Connection failure rejoin completed');
+        } catch (error) {
+          console.error('❌ Error in connection failure rejoin:', error);
+        }
+      }, 100); // Minimal delay just to ensure UI updates are complete
     } catch (error) {
       console.error('❌ Error handling connection failure:', error);
     }
@@ -3034,8 +3272,10 @@ Your browser or device does not support camera access.
     console.log('🔍 Set sessionVersion:', this.sessionVersion);
   }
 
-  // Create and send WebRTC offer (called by initiator after receiving ready signal)
+  // Create and send WebRTC offer (called by initiator after PubNub connection)
   private async createAndSendOffer(): Promise<void> {
+    console.log('🎯 createAndSendOffer called - starting offer creation process');
+
     // Prevent multiple offer creations
     if (this.peerConnection?.localDescription) {
       console.warn('⚠️ Offer already created, ignoring duplicate request');
@@ -3044,6 +3284,12 @@ Your browser or device does not support camera access.
 
     try {
       console.log('🎯 Creating WebRTC offer...');
+      console.log('🔍 Current state:', {
+        hasPeerConnection: !!this.peerConnection,
+        partnerId: this.partnerId,
+        roomId: this.currentRoomId,
+        sessionVersion: this.sessionVersion
+      });
 
       // SIMPLIFIED: Only ensure peer connection exists, don't force cleanup
       if (!this.peerConnection) {
