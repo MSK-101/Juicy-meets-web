@@ -555,13 +555,13 @@ export default function VideoChatPage() {
       }, 1000 + Math.random() * 2000); // Random delay between 1-3 seconds
     } else {
       // For real user matches, send via PubNub
-      // TODO: Implement message sending functionality
-      // try {
-      //   await cleanVideoChatService.sendMessage(input.trim());
-      // } catch {
-      //   // Silent error handling
-      // }
-      console.log('💬 Message sending not yet implemented');
+      try {
+        await cleanVideoChatService.sendMessage(input.trim());
+        console.log('✅ Message sent via PubNub');
+      } catch (error) {
+        console.error('❌ Failed to send message:', error);
+        // You might want to show an error to the user here
+      }
     }
 
     setInput("");

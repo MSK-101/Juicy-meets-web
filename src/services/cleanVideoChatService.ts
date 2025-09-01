@@ -256,6 +256,33 @@ export class CleanVideoChatService {
     this.onVideoMatchCallback = callback;
   }
 
+  // Send chat message to partner
+  async sendMessage(text: string): Promise<void> {
+    if (!text.trim()) {
+      console.warn('⚠️ Cannot send empty message');
+      return;
+    }
+
+    if (!this.partnerId) {
+      console.warn('⚠️ Cannot send message: no partner connected');
+      return;
+    }
+
+    if (!pubnubService.isConnected()) {
+      console.warn('⚠️ Cannot send message: PubNub not connected');
+      return;
+    }
+
+    try {
+      const messageId = `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      await pubnubService.sendChatMessage(this.partnerId, text.trim(), messageId);
+      console.log('✅ Chat message sent successfully:', text);
+    } catch (error) {
+      console.error('❌ Failed to send chat message:', error);
+      throw error;
+    }
+  }
+
   // Join the video chat queue
   async joinQueue(): Promise<void> {
     try {
@@ -1626,14 +1653,14 @@ Your browser or device does not support camera access.
       // Process messages in order by timestamp
       const sortedMessages = Array.from(this.messageBuffer.entries())
         .sort(([,a], [,b]) => {
-          const aTs = a[0]?.ts || 0;
-          const bTs = b[0]?.ts || 0;
+          const aTs = (a[0] as any)?.ts || 0;
+          const bTs = (b[0] as any)?.ts || 0;
           return aTs - bTs;
         });
 
-      for (const [channel, messages] of sortedMessages) {
+      for (const [, messages] of sortedMessages) {
         for (const message of messages) {
-          await this.handleIncomingSignal(message);
+          await this.handleIncomingSignal(message as any);
         }
       }
 
@@ -1646,13 +1673,16 @@ Your browser or device does not support camera access.
 
   // Listen for incoming signals from other users via PubNub
   private async handleIncomingSignal(signal: {
-    type: 'ready' | 'offer' | 'answer' | 'ice' | 'bye' | 'health';
+    type: 'ready' | 'offer' | 'answer' | 'ice' | 'bye' | 'health' | 'chat';
     from: string;
     to: string;
     sessionVersion: string;
     sdp?: string;
     candidate?: RTCIceCandidateInit;
     ts?: number;
+    text?: string;
+    timestamp?: number;
+    id?: string;
   }): Promise<void> {
     console.log('📨 Received signal:', signal.type, 'from:', signal.from, 'to:', signal.to);
 
@@ -1784,6 +1814,19 @@ Your browser or device does not support camera access.
             }
           } catch (error) {
             console.warn('⚠️ Failed to send heartbeat response:', error);
+          }
+          break;
+        case 'chat':
+          if (signal.text) {
+            console.log('💬 Received chat message from partner:', signal.text);
+            this.handleChatMessage({
+              text: signal.text,
+              from: signal.from,
+              timestamp: signal.timestamp || Date.now(),
+              id: signal.id
+            });
+          } else {
+            console.warn('⚠️ Received chat signal but no text data:', signal);
           }
           break;
         default:

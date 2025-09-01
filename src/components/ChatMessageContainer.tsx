@@ -62,7 +62,17 @@ export const ChatMessageContainer: React.FC<ChatMessageContainerProps> = ({
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-3">
+      <div
+        className="p-4 space-y-3"
+        style={{
+          // Dynamic height: min height for 2-3 messages, max for scrolling
+          height: messages.length === 0
+            ? '120px'
+            : Math.min(Math.max(messages.length * 60, 120), 400) + 'px',
+          maxHeight: '400px',
+          overflowY: messages.length > 6 ? 'auto' : 'hidden'
+        }}
+      >
         {messages.length === 0 ? (
           <div className="text-center text-gray-500 py-8">
             <p>No messages yet</p>

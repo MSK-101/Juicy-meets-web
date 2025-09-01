@@ -7,7 +7,8 @@ type WebRTCSignal =
   | { type: 'answer'; sdp: string; from: string; to: string; sessionVersion: string; }
   | { type: 'ice'; candidate: RTCIceCandidateInit; from: string; to: string; sessionVersion: string; }
   | { type: 'bye'; from: string; to: string; sessionVersion: string; }
-  | { type: 'health'; from: string; to: string; sessionVersion: string; ts: number; };
+  | { type: 'health'; from: string; to: string; sessionVersion: string; ts: number; }
+  | { type: 'chat'; text: string; from: string; to: string; sessionVersion: string; timestamp: number; id?: string; };
 
 type Handlers = {
   onMessage: (msg: WebRTCSignal) => void;
@@ -301,6 +302,27 @@ class PubNubService {
       }
     });
     console.log('💓 Health signal sent to', to);
+  }
+
+  // Send chat message
+  async sendChatMessage(to: string, text: string, messageId?: string): Promise<void> {
+    if (!this.client || !this.channel || !this.myUserId || !this.sessionVersion) {
+      throw new Error('Not connected to channel or missing session version');
+    }
+
+    await this.client.publish({
+      channel: this.channel,
+      message: {
+        type: 'chat',
+        text,
+        from: this.myUserId,
+        to,
+        sessionVersion: this.sessionVersion,
+        timestamp: Date.now(),
+        id: messageId
+      } as any
+    });
+    console.log('💬 Chat message sent to', to, ':', text);
   }
 
     // Check if connected

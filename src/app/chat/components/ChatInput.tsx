@@ -139,17 +139,21 @@ export default function ChatInput({ messages, input, setInput, handleSend, chatE
             ➤
           </button>
         </div>
-        {/* Messages container with fixed height, scroll, and fade/slide animation */}
+        {/* Messages container with dynamic height based on message count */}
         {messages.length > 0 && (
           <div
             className={`flex flex-col gap-1 transition-all duration-500 ease-in-out ${
               showMessages
-                ? 'opacity-100 max-h-[180px] overflow-y-auto translate-y-0'
+                ? 'opacity-100 overflow-y-auto translate-y-0'
                 : 'opacity-0 max-h-0 overflow-hidden -translate-y-4 pointer-events-none'
             }`}
             style={{
-              height: showMessages ? '180px' : '0px',
-              overflowY: showMessages ? 'auto' : 'hidden'
+              // Dynamic height: each message ~35px, max 180px (about 5 messages)
+              height: showMessages
+                ? Math.min(messages.length * 35, 180) + 'px'
+                : '0px',
+              maxHeight: '180px',
+              overflowY: showMessages && messages.length > 5 ? 'auto' : 'hidden'
             }}
           >
             {messages.map((msg, idx) => (
