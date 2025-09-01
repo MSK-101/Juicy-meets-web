@@ -163,7 +163,7 @@ export const SplitVideoChat: React.FC<SplitVideoChatProps> = ({
   // Show remote video on left side
   if (showRemote) {
     return (
-      <div className="w-full h-full relative bg-gray-900 border-2 border-red-500">
+      <div className="w-full h-full relative bg-gray-900">
         {hasRemoteStream && remoteStream ? (
           <div className="w-full h-full relative">
             <video
@@ -188,8 +188,11 @@ export const SplitVideoChat: React.FC<SplitVideoChatProps> = ({
                 <p className="text-gray-400 text-lg">Partner video loading...</p>
               </div>
             ) : (
-              <div className="text-center">
-                <p className="text-gray-400 text-lg">Waiting for connection...</p>
+              <div className="absolute inset-0 bg-black/80 flex items-center justify-center z-20">
+                  <div className="text-center text-white">
+                    <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-white mx-auto mb-4"></div>
+                    <p className="text-lg">Finding your next match...</p>
+                  </div>
               </div>
             )}
           </div>
