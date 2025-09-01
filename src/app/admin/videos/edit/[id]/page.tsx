@@ -51,8 +51,8 @@ export default function EditVideoPage({ params }: EditVideoPageProps) {
         name: video.name,
         gender: video.gender,
         status: video.status,
-        pool_id: video.pool.id.toString(),
-        sequence_id: video.sequence.id.toString(),
+        pool_id: video.pool?.id?.toString() || "",
+        sequence_id: video.sequence?.id?.toString() || "",
       });
 
       // Set current video URL if it exists
@@ -155,17 +155,19 @@ export default function EditVideoPage({ params }: EditVideoPageProps) {
                  } catch (error: unknown) {
       console.error("Error updating video:", error);
       // Handle specific error messages from the API
-      if (error.response?.data?.errors) {
-        const apiErrors = error.response.data.errors;
+      if (error && typeof error === 'object' && 'response' in error && 
+          error.response && typeof error.response === 'object' && 'data' in error.response &&
+          error.response.data && typeof error.response.data === 'object' && 'errors' in error.response.data) {
+        const apiErrors = (error.response.data as any).errors;
         const newErrors: Record<string, string> = {};
 
-        Object.keys(apiErrors).forEach(key => {
+        Object.keys(apiErrors).forEach((key: string) => {
           newErrors[key] = Array.isArray(apiErrors[key]) ? apiErrors[key][0] : apiErrors[key];
         });
 
         setErrors(newErrors);
       } else {
-        setErrors({ general: error.message || "Failed to update video" });
+        setErrors({ general: (error as Error)?.message || "Failed to update video" });
       }
     }
   };

@@ -109,8 +109,7 @@ export default function VideoChatPage() {
       setCurrentVideoId,
       setCurrentVideoUrl,
       setCurrentVideoName,
-      setMessages,
-      setRemoteStream
+      setMessages
     );
   };
 
@@ -316,27 +315,17 @@ export default function VideoChatPage() {
       });
 
       cleanVideoChatService.onPartnerLeft(() => {
-        console.log('👋 Partner left/swiped, preparing for new connection...');
-
-        // Clear current connection state
         setRemoteStream(null);
         setConnectionState('disconnected');
         setIsVideoPlaying(false);
         setCurrentVideoId(null);
         setCurrentVideoUrl(null);
         setCurrentVideoName(null);
-
         // Clear messages when partner leaves
         setMessages([]);
 
         // Stop tracking chat duration
         coinDeductionService.stopChatDurationTracking();
-
-        // Show connecting state to indicate we're looking for a new match
-        setConnectionState('connecting');
-        setIsConnecting(true);
-
-        console.log('🔄 Partner left, now looking for new match...');
       });
 
       // Set up message listener
@@ -558,11 +547,13 @@ export default function VideoChatPage() {
       }, 1000 + Math.random() * 2000); // Random delay between 1-3 seconds
     } else {
       // For real user matches, send via PubNub
-      try {
-        await cleanVideoChatService.sendMessage(input.trim());
-      } catch {
-        // Silent error handling
-      }
+      // TODO: Implement message sending functionality
+      // try {
+      //   await cleanVideoChatService.sendMessage(input.trim());
+      // } catch {
+      //   // Silent error handling
+      // }
+      console.log('💬 Message sending not yet implemented');
     }
 
     setInput("");
@@ -599,21 +590,6 @@ export default function VideoChatPage() {
 
       {/* Main video chat interface */}
       <div className="w-full h-full flex flex-col md:flex-row items-stretch justify-stretch p-0">
-        {/* Sequence Progress Display */}
-        {user && (user.sequence_id || user.pool_id) && (
-          <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-30 bg-black/80 text-white px-4 py-2 rounded-lg text-sm">
-            <div className="flex items-center gap-4">
-              <span>Pool: {user.pool_id || 'N/A'}</span>
-              <span>Sequence: {user.sequence_id || 'N/A'}</span>
-              {user.videos_watched_in_current_sequence !== undefined && user.sequence_total_videos && (
-                <span>
-                  Progress: {user.videos_watched_in_current_sequence}/{user.sequence_total_videos}
-                  ({Math.round((user.videos_watched_in_current_sequence / user.sequence_total_videos) * 100)}%)
-                </span>
-              )}
-            </div>
-          </div>
-        )}
 
         <div
           className="gradient-border border md:border-[3px] w-full h-full flex flex-col md:flex-row overflow-hidden relative"

@@ -175,9 +175,6 @@ export const SplitVideoChat: React.FC<SplitVideoChatProps> = ({
               style={{ border: '2px solid red' }}
             />
             {/* Simple debug info */}
-            <div className="absolute top-2 left-2 bg-red-500 text-white text-xs p-2 rounded">
-              Video: {remoteStream.getVideoTracks().length} | Audio: {remoteStream.getAudioTracks().length}
-            </div>
           </div>
         ) : (
           <div className="w-full h-full flex items-center justify-center bg-gray-800">

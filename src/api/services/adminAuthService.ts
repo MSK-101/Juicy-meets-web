@@ -24,12 +24,12 @@ export interface AdminLoginResponse {
 export const adminAuthService = {
   // Admin Authentication
   login: async (credentials: AdminLoginRequest): Promise<AdminLoginResponse> => {
-    const response = await api.post("/admin/auth/login", credentials);
+    const response = await api.post("/admin/auth/login", credentials) as AdminLoginResponse;
     console.log("Admin login response:", response);
 
     // Check if response has the expected structure
-    if (response && response.success && response.data) {
-      return response.data;
+    if (response && response.admin && response.token) {
+      return response;
     } else {
       console.error("Unexpected response format:", response);
       throw new Error("Invalid response format from server");
@@ -39,7 +39,7 @@ export const adminAuthService = {
   logout: (): Promise<void> => api.delete("/admin/auth/logout") as Promise<void>,
 
   getCurrentAdmin: async (): Promise<{ admin: Admin }> => {
-    const response = await api.get("/admin/auth/me") as { success: boolean; data: { admin: Admin } };
-    return response.data;
+    const response = await api.get("/admin/auth/me") as { admin: Admin };
+    return response;
   },
 };

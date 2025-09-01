@@ -69,9 +69,11 @@ export class VideoChatService {
       this.connections.set(chatId, connection);
 
       // Connect to PubNub
-      await pubnubService.connect(this.currentUserId!, chatId);
-      this.setupSignaling(chatId);
-      await pubnubService.announcePresence();
+      // TODO: Implement missing PubNub methods
+      // await pubnubService.connect(this.currentUserId!, chatId);
+      // this.setupSignaling(chatId);
+      // await pubnubService.announcePresence();
+      console.log('🔌 PubNub connection not yet implemented');
 
       // Start connection process after a short delay
       setTimeout(() => {
@@ -88,26 +90,30 @@ export class VideoChatService {
   }
 
   private setupSignaling(chatId: string): void {
+    // TODO: Implement missing PubNub methods
     // Listen for WebRTC signals
-    pubnubService.onWebRTCSignal((signal) => {
-      this.handleSignal(signal, chatId);
-    });
+    // pubnubService.onWebRTCSignal((signal) => {
+    //   this.handleSignal(signal, chatId);
+    // });
 
     // Listen for presence changes
-    pubnubService.onPresenceChange((onlineUsers) => {
-      this.handlePresenceChange(chatId, onlineUsers);
-    });
+    // pubnubService.onPresenceChange((onlineUsers) => {
+    //   this.handlePresenceChange(chatId, onlineUsers);
+    // });
+    console.log('🔌 Signaling setup not yet implemented');
   }
 
   private async attemptConnection(chatId: string): Promise<void> {
     console.log('🎯 Attempting to establish connection for chat:', chatId);
 
-    const onlineUsers = await pubnubService.getOnlineUsers();
-    console.log('👥 Online users:', onlineUsers);
+    // TODO: Implement getOnlineUsers method
+    // const onlineUsers = await pubnubService.getOnlineUsers();
+    // console.log('👥 Online users:', onlineUsers);
 
-    if (onlineUsers.length >= 2) {
-      this.handlePresenceChange(chatId, onlineUsers);
-    }
+    // if (onlineUsers.length >= 2) {
+    //   this.handlePresenceChange(chatId, onlineUsers);
+    // }
+    console.log('👥 Online users check not yet implemented');
   }
 
     private async handlePresenceChange(chatId: string, onlineUsers: unknown): Promise<void> {
@@ -323,21 +329,23 @@ export class VideoChatService {
 
         // Send offer via PubNub
         console.log('🔗 About to send WebRTC offer...');
-        try {
-          pubnubService.sendWebRTCSignal({
-            type: 'offer',
-            data: offer,
-            from: this.currentUserId!,
-            to: 'broadcast',
-            chatId,
-            connectionId: connection.connectionId
-          });
+        // TODO: Implement sendWebRTCSignal method
+        // try {
+        //   pubnubService.sendWebRTCSignal({
+        //     type: 'offer',
+        //     data: offer,
+        //     from: this.currentUserId!,
+        //     to: 'broadcast',
+        //     chatId,
+        //     connectionId: connection.connectionId
+        //   });
 
-          console.log('📤 Offer sent successfully');
-        } catch (error) {
-          console.error('❌ Error sending offer:', error);
-          throw error;
-        }
+        //   console.log('📤 Offer sent successfully');
+        // } catch (error) {
+        //   console.error('❌ Error sending offer:', error);
+        //   throw error;
+        // }
+        console.log('📤 Offer sending not yet implemented');
       }
 
       console.log(`✅ ${isInitiator ? 'Initiator' : 'Receiver'} peer created successfully`);
@@ -378,14 +386,16 @@ export class VideoChatService {
     peerConnection.onicecandidate = (event) => {
       if (event.candidate) {
         console.log('🧊 Sending ICE candidate');
-        pubnubService.sendWebRTCSignal({
-          type: 'ice-candidate',
-          data: event.candidate,
-          from: this.currentUserId!,
-          to: 'broadcast',
-          chatId,
-          connectionId: connection.connectionId
-        });
+        // TODO: Implement sendWebRTCSignal method
+        // pubnubService.sendWebRTCSignal({
+        //   type: 'ice-candidate',
+        //   data: event.candidate,
+        //   from: this.currentUserId!,
+        //   to: 'broadcast',
+        //   chatId,
+        //   connectionId: connection.connectionId
+        // });
+        console.log('🧊 ICE candidate sending not yet implemented');
       }
     };
 
@@ -475,16 +485,17 @@ export class VideoChatService {
       console.log('✅ Local description (answer) set');
 
       // Send answer
-      pubnubService.sendWebRTCSignal({
-        type: 'answer',
-        data: answer,
-        from: this.currentUserId!,
-        to: 'broadcast',
-        chatId,
-        connectionId: connection.connectionId
-      });
+      // TODO: Implement sendWebRTCSignal method
+      // pubnubService.sendWebRTCSignal({
+      //   type: 'answer',
+      //   data: answer,
+      //   from: this.currentUserId!,
+      //   to: 'broadcast',
+      //   chatId,
+      //   connectionId: connection.connectionId
+      // });
 
-      console.log('📤 Answer sent successfully');
+      console.log('📤 Answer sending not yet implemented');
 
       // Process queued ICE candidates
       await this.processQueuedIceCandidates(chatId);

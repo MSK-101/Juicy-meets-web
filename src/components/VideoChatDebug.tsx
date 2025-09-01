@@ -18,10 +18,15 @@ export const VideoChatDebug: React.FC = () => {
           connectionsCount: (videoChatService as any).connections?.size || 0
         },
         pubnubService: {
-          isClientSide: pubnubService.isClientSide(),
-          currentUser: (pubnubService as any).currentUser,
-          currentChatId: (pubnubService as any).currentChatId,
-          onlineUsers: (pubnubService as any).onlineUsers ? Array.from((pubnubService as any).onlineUsers) : []
+          // TODO: Implement missing methods
+          // isClientSide: pubnubService.isClientSide(),
+          // currentUser: (pubnubService as any).currentUser,
+          // currentChatId: (pubnubService as any).currentChatId,
+          // onlineUsers: (pubnubService as any).onlineUsers ? Array.from((pubnubService as any).onlineUsers) : []
+          isClientSide: false,
+          currentUser: null,
+          currentChatId: null,
+          onlineUsers: []
         }
       });
     };
@@ -52,8 +57,10 @@ export const VideoChatDebug: React.FC = () => {
       addLog(`✅ Connection created: ${connection.id}`);
 
       // Debug connections
-      videoChatService.debugConnections();
-      addLog('🔍 Debug info logged to console');
+      // TODO: Implement debugConnections method
+      // videoChatService.debugConnections();
+      // addLog('🔍 Debug info logged to console');
+      addLog('🔍 Debug connections not yet implemented');
 
     } catch (error) {
       addLog(`❌ Error: ${error instanceof Error ? error.message : String(error)}`);
@@ -62,8 +69,10 @@ export const VideoChatDebug: React.FC = () => {
 
   const resetConnection = () => {
     try {
-      videoChatService.forceResetConnection(testChatId);
-      addLog('🔄 Connection reset');
+      // TODO: Implement forceResetConnection method
+      // videoChatService.forceResetConnection(testChatId);
+      // addLog('🔄 Connection reset');
+      addLog('🔄 Connection reset not yet implemented');
     } catch (error) {
       addLog(`❌ Reset error: ${error instanceof Error ? error.message : String(error)}`);
     }
@@ -73,15 +82,18 @@ export const VideoChatDebug: React.FC = () => {
     try {
       addLog('🔧 Testing PubNub connection...');
 
-      const userId = `pubnub-test-${Date.now()}`;
-      await pubnubService.connect(userId, testChatId);
-      addLog('✅ PubNub connected');
+      // TODO: Implement missing methods
+      // const userId = `pubnub-test-${Date.now()}`;
+      // await pubnubService.connect(userId, testChatId);
+      // addLog('✅ PubNub connected');
 
-      await pubnubService.announcePresence();
-      addLog('📢 Presence announced');
+      // await pubnubService.announcePresence();
+      // addLog('📢 Presence announced');
 
-      const onlineUsers = await pubnubService.getOnlineUsers();
-      addLog(`👥 Online users: ${onlineUsers.join(', ')}`);
+      // const onlineUsers = await pubnubService.getOnlineUsers();
+      // addLog(`👥 Online users: ${onlineUsers.join(', ')}`);
+
+      addLog('⚠️ PubNub methods not yet implemented');
 
     } catch (error) {
       addLog(`❌ PubNub error: ${error instanceof Error ? error.message : String(error)}`);

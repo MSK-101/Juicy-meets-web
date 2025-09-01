@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import type { AdminAPIError } from "@/api/adminBaseAPI";
+import { AdminAPIError } from "@/api/adminBaseAPI";
 import type { FormErrors } from "@/api/types";
 
 interface UseApiErrorReturn {

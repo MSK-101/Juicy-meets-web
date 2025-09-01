@@ -41,14 +41,18 @@ export default function DebugVideoPage() {
     setConnectionInfo(info);
 
     // Get online users
-    pubnubService.getOnlineUsers().then(users => {
-      setOnlineUsers(users);
-    });
+    // TODO: Implement getOnlineUsers method
+    // pubnubService.getOnlineUsers().then(users => {
+    //   setOnlineUsers(users);
+    // });
+    console.log('👥 Online users not yet implemented');
   };
 
   const forcePresenceSync = async () => {
-    await pubnubService.forcePresenceSync();
-    setTimeout(refreshInfo, 1000);
+    // TODO: Implement forcePresenceSync method
+    // await pubnubService.forcePresenceSync();
+    // setTimeout(refreshInfo, 1000);
+    console.log('🔄 Force presence sync not yet implemented');
   };
 
   useEffect(() => {

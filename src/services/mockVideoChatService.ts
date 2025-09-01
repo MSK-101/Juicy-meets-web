@@ -133,7 +133,7 @@ export class MockVideoChatService {
       });
 
       // If initiator, create and send offer
-      if (this.isInitiator) {
+      if (this.isInitiator && this.peerConnection) {
         console.log('📤 Creating offer...');
         const offer = await this.peerConnection.createOffer({
           offerToReceiveAudio: true,
