@@ -71,7 +71,20 @@ export const useAuthStore = create<UserState>()(
           user: state.user ? { ...state.user, ...updates } : null,
         })),
 
-      clearUser: () => set({ user: null, isLoading: false }),
+      clearUser: () => {
+        // Clear user from store
+        set({ user: null, isLoading: false });
+        // Clear all localStorage data related to authentication
+        try {
+          localStorage.removeItem('juicy-meets-auth-storage');
+          localStorage.removeItem('juicyMeetsUser');
+          localStorage.removeItem('juicyMeetsAuthToken');
+          localStorage.removeItem('juicyMeetsUserDetails');
+          console.log('🧹 Cleared all authentication data from localStorage');
+        } catch (error) {
+          console.error('❌ Error clearing localStorage:', error);
+        }
+      },
 
       setLoading: (loading: boolean) => set({ isLoading: loading }),
 
