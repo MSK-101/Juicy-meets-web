@@ -6,6 +6,7 @@ import { User } from "@/lib/admin-types";
 import DataTable from "@/components/admin/DataTable";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faSearch } from "@fortawesome/free-solid-svg-icons";
+import { useAdminToken } from "@/store/adminAuth";
 
 export default function Users() {
   const [users, setUsers] = useState<User[]>([]);
@@ -14,16 +15,21 @@ export default function Users() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalUsers, setTotalUsers] = useState(0);
+  const adminToken = useAdminToken();
 
   useEffect(() => {
     const fetchData = async () => {
       try {
         const [usersResponse, statsResponse] = await Promise.all([
-          adminApi.getUsers(currentPage, 10, statusFilter === "all" ? undefined : statusFilter, searchQuery || undefined),
-          adminApi.getUserStats(),
+          adminApi.getUsers(currentPage, 10, statusFilter === "all" ? undefined : statusFilter, searchQuery || undefined, adminToken || undefined),
+          adminApi.getUserStats(adminToken || undefined),
         ]);
 
         setUsers(usersResponse.data.data);
+        setTotalPages(usersResponse.data.totalPages);
+        setTotalUsers(usersResponse.data.total);
         setStats(statsResponse.data);
       } catch (error) {
         console.error("Failed to fetch users data:", error);
@@ -43,10 +49,10 @@ export default function Users() {
   const columns = [
     { key: "username", label: "Username" },
     { key: "email", label: "Email" },
-    { key: "coinPurchased", label: "Coin Purchased" },
-    { key: "deposits", label: "Deposits" },
-    { key: "totalSpent", label: "Total Spent" },
-    { key: "lastLogin", label: "Last Login" },
+    { key: "coinPurchased", label: "Coins Purchased" },
+    { key: "deposits", label: "Number of Purchases" },
+    { key: "totalSpent", label: "Total Spent ($)" },
+    { key: "lastLogin", label: "Last Activity" },
   ];
 
   if (loading) {
@@ -139,6 +145,51 @@ export default function Users() {
       </div>
       <div className="bg-gray-100 rounded-2xl p-4 shadow-md">
         <DataTable columns={columns} data={users as unknown as Record<string, unknown>[]} />
+
+        {/* Pagination */}
+        <div className="flex items-center justify-between mt-6">
+          <div className="text-sm text-gray-600">
+            Showing {((currentPage - 1) * 10) + 1} to {Math.min(currentPage * 10, totalUsers)} of {totalUsers} users
+          </div>
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+              disabled={currentPage === 1}
+              className="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Previous
+            </button>
+
+            <div className="flex items-center space-x-1">
+              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                const pageNum = Math.max(1, Math.min(totalPages - 4, currentPage - 2)) + i;
+                if (pageNum > totalPages) return null;
+
+                return (
+                  <button
+                    key={pageNum}
+                    onClick={() => setCurrentPage(pageNum)}
+                    className={`px-3 py-2 text-sm font-medium rounded-lg ${
+                      currentPage === pageNum
+                        ? 'bg-purple-600 text-white'
+                        : 'text-gray-500 bg-white border border-gray-300 hover:bg-gray-50'
+                    }`}
+                  >
+                    {pageNum}
+                  </button>
+                );
+              })}
+            </div>
+
+            <button
+              onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+              disabled={currentPage === totalPages}
+              className="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Next
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );

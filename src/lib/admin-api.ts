@@ -33,96 +33,6 @@ const mockDashboardData: DashboardData = {
   ],
 };
 
-const mockUsers: User[] = [
-  {
-    id: "1",
-    username: "Silva",
-    email: "s34@gmail.com",
-    coinPurchased: 120,
-    deposits: 2,
-    totalSpent: "Bi-Direct",
-    lastLogin: "06/7/2025",
-    status: "active",
-  },
-  {
-    id: "2",
-    username: "Kavia",
-    email: "kav@gmail.com",
-    coinPurchased: 560,
-    deposits: 4,
-    totalSpent: "In-Search",
-    lastLogin: "04/24/2025",
-    status: "active",
-  },
-  {
-    id: "3",
-    username: "Silva",
-    email: "s34@gmail.com",
-    coinPurchased: 120,
-    deposits: 2,
-    totalSpent: "Bi-Direct",
-    lastLogin: "06/7/2025",
-    status: "inactive",
-  },
-  {
-    id: "4",
-    username: "Kavia",
-    email: "kav@gmail.com",
-    coinPurchased: 560,
-    deposits: 4,
-    totalSpent: "In-Search",
-    lastLogin: "04/24/2025",
-    status: "banned",
-  },
-];
-
-const mockVideos: Video[] = [
-  {
-    id: "1",
-    name: "Video",
-    uploader: "Robert Smith",
-    gender: "M",
-    sequence: "A1",
-    pool: "A",
-    swipeCount: 80,
-    viewCount: 67,
-    uploaded: "06/7/2025",
-  },
-  {
-    id: "2",
-    name: "Video",
-    uploader: "Theressa Kay",
-    gender: "F",
-    sequence: "B2",
-    pool: "B",
-    swipeCount: 50,
-    viewCount: 45,
-    uploaded: "04/24/2025",
-  },
-  {
-    id: "3",
-    name: "Video 1",
-    uploader: "William May",
-    gender: "M",
-    sequence: "A1",
-    pool: "A",
-    swipeCount: 23,
-    viewCount: 76,
-    uploaded: "06/7/2025",
-  },
-  {
-    id: "4",
-    name: "Video",
-    uploader: "Meka Siky",
-    gender: "F",
-    sequence: "B3",
-    pool: "B",
-    swipeCount: 50,
-    viewCount: 45,
-    uploaded: "04/24/2025",
-  },
-];
-
 // API Functions
 export const adminApi = {
   // Dashboard
@@ -140,51 +50,63 @@ export const adminApi = {
     page: number = 1,
     limit: number = 10,
     status?: string,
-    search?: string
+    search?: string,
+    token?: string
   ): Promise<ApiResponse<PaginatedResponse<User>>> => {
-    await new Promise(resolve => setTimeout(resolve, 300));
+    try {
+      const params = new URLSearchParams({
+        page: page.toString(),
+        limit: limit.toString(),
+      });
 
-    let filteredUsers = [...mockUsers];
+      if (status && status !== "all") {
+        params.append('status', status);
+      }
 
-    if (status && status !== "all") {
-      filteredUsers = filteredUsers.filter(user => user.status === status);
+      if (search) {
+        params.append('search', search);
+      }
+
+      const response = await fetch(`/api/v1/admin/users?${params}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      console.error('Error fetching users:', error);
+      throw error;
     }
-
-    if (search) {
-      filteredUsers = filteredUsers.filter(
-        user =>
-          user.username.toLowerCase().includes(search.toLowerCase()) ||
-          user.email.toLowerCase().includes(search.toLowerCase())
-      );
-    }
-
-    const total = filteredUsers.length;
-    const startIndex = (page - 1) * limit;
-    const endIndex = startIndex + limit;
-    const paginatedUsers = filteredUsers.slice(startIndex, endIndex);
-
-    return {
-      success: true,
-      data: {
-        data: paginatedUsers,
-        total,
-        page,
-        limit,
-        totalPages: Math.ceil(total / limit),
-      },
-    };
   },
 
-  getUserStats: async (): Promise<ApiResponse<{ registered: number; inactive: number; newUsers: number }>> => {
-    await new Promise(resolve => setTimeout(resolve, 200));
-    return {
-      success: true,
-      data: {
-        registered: 5000,
-        inactive: 200,
-        newUsers: 163,
-      },
-    };
+  getUserStats: async (token?: string): Promise<ApiResponse<{ registered: number; inactive: number; newUsers: number }>> => {
+    try {
+      const response = await fetch(`/api/v1/admin/users/stats`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      console.error('Error fetching user stats:', error);
+      throw error;
+    }
   },
 
   // Videos

@@ -40,7 +40,7 @@ export interface User {
   email: string;
   coinPurchased: number;
   deposits: number;
-  totalSpent: string;
+  totalSpent: number;
   lastLogin: string;
   status: 'active' | 'inactive' | 'banned' | 'pending';
 }
