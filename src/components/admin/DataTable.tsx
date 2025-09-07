@@ -34,7 +34,7 @@ export default function DataTable({ columns, data, className = "" }: DataTablePr
                 >
                   {column.render
                     ? column.render(row[column.key], row)
-                    : String(row[column.key] || "")}
+                    : String(row[column.key] || "-")}
                 </td>
               ))}
             </tr>

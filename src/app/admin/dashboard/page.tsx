@@ -6,17 +6,19 @@ import { DashboardData } from "@/lib/admin-types";
 import StatCard from "@/components/admin/StatCard";
 import DataTable from "@/components/admin/DataTable";
 import ChartComponent from "@/components/admin/ChartComponent";
+import { useAdminToken } from "@/store/adminAuth";
 
 export default function Dashboard() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [userFilter, setUserFilter] = useState("today");
   const [videoFilter, setVideoFilter] = useState("today");
+  const adminToken = useAdminToken();
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const response = await adminApi.getDashboardData();
+        const response = await adminApi.getDashboardData(adminToken || undefined);
         setData(response.data);
       } catch (error) {
         console.error("Failed to fetch dashboard data:", error);
@@ -49,7 +51,7 @@ export default function Dashboard() {
 
   const topVideosColumns = [
     { key: "name", label: "Video Name/Sequence" },
-    { key: "views", label: "Number of Views" },
+    { key: "views", label: "Number of Views(min)" },
   ];
 
   return (
@@ -70,7 +72,7 @@ export default function Dashboard() {
       <div className="flex gap-4 lg:gap-6 items-center">
         <StatCard
           title="Views"
-          value={data.stats.views.toLocaleString()}
+          value={`${data.stats.views.toFixed(2)} min`}
           change="+11.01%"
           isPositive={true}
           index={0}

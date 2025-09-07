@@ -36,13 +36,26 @@ const mockDashboardData: DashboardData = {
 // API Functions
 export const adminApi = {
   // Dashboard
-  getDashboardData: async (): Promise<ApiResponse<DashboardData>> => {
-    // Simulate API delay
-    await new Promise(resolve => setTimeout(resolve, 500));
-    return {
-      success: true,
-      data: mockDashboardData,
-    };
+  getDashboardData: async (token?: string): Promise<ApiResponse<DashboardData>> => {
+    try {
+      const response = await fetch('/api/v1/admin/dashboard', {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      console.error('Error fetching dashboard data:', error);
+      throw error;
+    }
   },
 
   // Users
@@ -115,54 +128,67 @@ export const adminApi = {
     limit: number = 10,
     pool?: string,
     sequence?: string,
-    search?: string
+    search?: string,
+    token?: string
   ): Promise<ApiResponse<PaginatedResponse<Video>>> => {
-    await new Promise(resolve => setTimeout(resolve, 300));
+    try {
+      const params = new URLSearchParams({
+        page: page.toString(),
+        limit: limit.toString(),
+      });
 
-    let filteredVideos = [...mockVideos];
+      if (pool) {
+        params.append('pool', pool);
+      }
 
-    if (pool) {
-      filteredVideos = filteredVideos.filter(video => video.pool === pool);
+      if (sequence) {
+        params.append('sequence', sequence);
+      }
+
+      if (search) {
+        params.append('search', search);
+      }
+
+      const response = await fetch(`/api/v1/admin/videos?${params}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      console.error('Error fetching videos:', error);
+      throw error;
     }
-
-    if (sequence) {
-      filteredVideos = filteredVideos.filter(video => video.sequence === sequence);
-    }
-
-    if (search) {
-      filteredVideos = filteredVideos.filter(
-        video =>
-          video.name.toLowerCase().includes(search.toLowerCase()) ||
-          video.uploader.toLowerCase().includes(search.toLowerCase())
-      );
-    }
-
-    const total = filteredVideos.length;
-    const startIndex = (page - 1) * limit;
-    const endIndex = startIndex + limit;
-    const paginatedVideos = filteredVideos.slice(startIndex, endIndex);
-
-    return {
-      success: true,
-      data: {
-        data: paginatedVideos,
-        total,
-        page,
-        limit,
-        totalPages: Math.ceil(total / limit),
-      },
-    };
   },
 
-  getVideoFilters: async (): Promise<ApiResponse<{ pools: string[]; sequences: string[] }>> => {
-    await new Promise(resolve => setTimeout(resolve, 200));
-    return {
-      success: true,
-      data: {
-        pools: ["A", "B", "C"],
-        sequences: ["1", "2", "3"],
-      },
-    };
+  getVideoFilters: async (token?: string): Promise<ApiResponse<{ pools: string[]; sequences: string[] }>> => {
+    try {
+      const response = await fetch('/api/v1/admin/videos/filters', {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      console.error('Error fetching video filters:', error);
+      throw error;
+    }
   },
 
   // Authentication

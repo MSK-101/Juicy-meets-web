@@ -64,11 +64,11 @@ export default function PaidStaff() {
       render: (value: unknown): React.ReactNode => (
         <div className="flex items-center space-x-2">
           <span>{String(value)}</span>
-          <select className="text-xs border-none bg-transparent text-gray-500">
+          {/* <select className="text-xs border-none bg-transparent text-gray-500">
             <option>Today</option>
             <option>Weekly</option>
             <option>Monthly</option>
-          </select>
+          </select> */}
         </div>
       )
     },
@@ -103,18 +103,18 @@ export default function PaidStaff() {
         return value as string;
       }
     },
-    {
-      key: "assignmentStatus",
-      label: "Assignment Status",
-      render: (value: unknown): React.ReactNode => (
-        <div className="flex items-center space-x-2">
-          <div className={`w-2 h-2 rounded-full ${value === 'active' ? 'bg-green-500' : 'bg-gray-400'}`}></div>
-          <span className={`text-sm ${value === 'active' ? 'text-green-600' : 'text-gray-500'}`}>
-            {value === 'active' ? 'Active' : 'Inactive'}
-          </span>
-        </div>
-      )
-    },
+    // {
+    //   key: "assignmentStatus",
+    //   label: "Assignment Status",
+    //   render: (value: unknown): React.ReactNode => (
+    //     <div className="flex items-center space-x-2">
+    //       <div className={`w-2 h-2 rounded-full ${value === 'active' ? 'bg-green-500' : 'bg-gray-400'}`}></div>
+    //       <span className={`text-sm ${value === 'active' ? 'text-green-600' : 'text-gray-500'}`}>
+    //         {value === 'active' ? 'Active' : 'Inactive'}
+    //       </span>
+    //     </div>
+    //   )
+    // },
     { key: "regDate", label: "Reg. Date" },
     {
       key: "action",
