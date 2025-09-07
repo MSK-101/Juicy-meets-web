@@ -47,7 +47,7 @@ export default function AddPackage() {
       newErrors.coins_count = "Coins count must be greater than 0";
     }
 
-    if (formData.sort_order < 0) {
+    if (formData.sort_order !== undefined && formData.sort_order < 0) {
       newErrors.sort_order = "Sort order must be 0 or greater";
     }
 
