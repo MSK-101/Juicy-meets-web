@@ -171,6 +171,8 @@ export const SplitVideoChat: React.FC<SplitVideoChatProps> = ({
               autoPlay
               playsInline
               muted={false}
+              controls={false}
+              disablePictureInPicture
               className="w-full h-full object-cover"
             />
             {/* Simple debug info */}
@@ -210,6 +212,8 @@ export const SplitVideoChat: React.FC<SplitVideoChatProps> = ({
             autoPlay
             playsInline
             muted
+            controls={false}
+            disablePictureInPicture
             className="w-full h-full object-cover"
           />
         </div>
