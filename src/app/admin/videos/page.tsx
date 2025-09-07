@@ -1,48 +1,34 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { adminApi } from "@/lib/admin-api";
-import { Video } from "@/lib/admin-types";
+import { useVideos, useVideoFilters } from "@/api/hooks/useVideosQueries";
+import { usePools } from "@/api/hooks/usePoolsQueries";
 import DataTable from "@/components/admin/DataTable";
+import Pagination from "@/components/Pagination";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faSearch, faEdit } from "@fortawesome/free-solid-svg-icons";
-import { useAdminToken } from "@/store/adminAuth";
 
 export default function Videos() {
   const router = useRouter();
-  const [videos, setVideos] = useState<Video[]>([]);
-  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
-  const [poolFilter, setPoolFilter] = useState<string>("");
-  const [sequenceFilter, setSequenceFilter] = useState<string>("");
+  const [poolFilter, setPoolFilter] = useState<number | null>(null);
+  const [genderFilter, setGenderFilter] = useState<string>("");
+  const [statusFilter, setStatusFilter] = useState<string>("");
   const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [totalVideos, setTotalVideos] = useState(0);
-  const [filters, setFilters] = useState<{ pools: string[]; sequences: string[] }>({ pools: [], sequences: [] });
-  const adminToken = useAdminToken();
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [videosResponse, filtersResponse] = await Promise.all([
-          adminApi.getVideos(currentPage, 10, poolFilter || undefined, sequenceFilter || undefined, searchQuery || undefined, adminToken || undefined),
-          adminApi.getVideoFilters(adminToken || undefined),
-        ]);
+  // Fetch data
+  const { data: videosData, isLoading: videosLoading, error: videosError } = useVideos({
+    page: currentPage,
+    per_page: 10,
+                 pool_id: poolFilter || undefined,
+    gender: genderFilter || undefined,
+    status: statusFilter || undefined,
+    search: searchQuery || undefined,
+  });
 
-        setVideos(videosResponse.data.data);
-        setTotalPages(videosResponse.data.totalPages);
-        setTotalVideos(videosResponse.data.total);
-        setFilters(filtersResponse.data);
-      } catch (error) {
-        console.error("Failed to fetch videos data:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchData();
-  }, [currentPage, poolFilter, sequenceFilter, searchQuery, adminToken]);
+  const { data: filtersData, isLoading: filtersLoading } = useVideoFilters();
+  const { data: poolsData, isLoading: poolsLoading } = usePools();
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -51,14 +37,50 @@ export default function Videos() {
 
   const columns = [
     { key: "name", label: "Video Name" },
-    { key: "gender", label: "Gender" },
-    { key: "status", label: "Status" },
-    { key: "pool", label: "Pool" },
-    { key: "sequence", label: "Sequence" },
-    { key: "uploader", label: "Uploader" },
-    { key: "swipeCount", label: "Swipes" },
-    { key: "viewCount", label: "Views (min)" },
-    { key: "uploaded", label: "Uploaded" },
+    {
+      key: "gender",
+      label: "Gender",
+      render: (value: unknown) => typeof value === 'string' ? value.charAt(0).toUpperCase() + value.slice(1) : 'N/A'
+    },
+    {
+      key: "status",
+      label: "Status",
+      render: (value: unknown) => typeof value === 'string' ? value.charAt(0).toUpperCase() + value.slice(1) : 'N/A'
+    },
+    {
+      key: "pool",
+      label: "Pool",
+      render: (value: unknown) => {
+        const pool = value as { name?: string };
+        return pool?.name || "N/A";
+      }
+    },
+    {
+      key: "sequence",
+      label: "Sequence",
+      render: (value: unknown) => {
+        const sequence = value as { name?: string };
+        return sequence?.name || "N/A";
+      }
+    },
+    {
+      key: "admin",
+      label: "Uploaded By",
+      render: (value: unknown) => {
+        const admin = value as { display_name?: string; email?: string };
+        return admin?.display_name || admin?.email || "N/A";
+      }
+    },
+    {
+      key: "created_at",
+      label: "Uploaded",
+      render: (value: unknown) => {
+        if (typeof value === 'string') {
+          return new Date(value).toLocaleDateString();
+        }
+        return 'N/A';
+      }
+    },
     {
       key: "actions",
       label: "Actions",
@@ -77,13 +99,28 @@ export default function Videos() {
     },
   ];
 
-  if (loading) {
+  if (videosLoading || filtersLoading || poolsLoading) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
       </div>
     );
   }
+
+  if (videosError) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">Error loading videos</h3>
+          <p className="text-gray-600">Please try again later.</p>
+        </div>
+      </div>
+    );
+  }
+
+  const videos = videosData?.videos || [];
+  const filters = filtersData || { pools: [], genders: [], statuses: [] };
+  const pools = poolsData || [];
 
   return (
     <div className="space-y-6 min-h-full">
@@ -116,33 +153,51 @@ export default function Videos() {
 
       <div className="flex flex-wrap items-center gap-4">
         <select
-          value={poolFilter}
+          value={poolFilter || ""}
           onChange={(e) => {
-            setPoolFilter(e.target.value);
+                                 setPoolFilter(e.target.value ? Number(e.target.value) : null);
             setCurrentPage(1);
           }}
           className="border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white text-black font-poppins focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
         >
           <option value="">All Pools</option>
-          {filters.pools.map((pool) => (
-            <option key={pool} value={pool}>
-              {pool}
+          {pools.map((pool) => (
+            <option key={pool.id} value={pool.id}>
+              {pool.name}
+            </option>
+          ))}
+        </select>
+
+                         {/* Sequence filter removed for now - can be added later if needed */}
+
+        <select
+          value={genderFilter}
+          onChange={(e) => {
+            setGenderFilter(e.target.value);
+            setCurrentPage(1);
+          }}
+          className="border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white text-black font-poppins focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+        >
+          <option value="">All Genders</option>
+          {filters.genders.map((gender) => (
+            <option key={gender.value} value={gender.value}>
+              {gender.label}
             </option>
           ))}
         </select>
 
         <select
-          value={sequenceFilter}
+          value={statusFilter}
           onChange={(e) => {
-            setSequenceFilter(e.target.value);
+            setStatusFilter(e.target.value);
             setCurrentPage(1);
           }}
           className="border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white text-black font-poppins focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
         >
-          <option value="">All Sequences</option>
-          {filters.sequences.map((sequence) => (
-            <option key={sequence} value={sequence}>
-              {sequence}
+          <option value="">All Statuses</option>
+          {filters.statuses.map((status) => (
+            <option key={status.value} value={status.value}>
+              {status.label}
             </option>
           ))}
         </select>
@@ -154,33 +209,17 @@ export default function Videos() {
           data={videos as unknown as Record<string, unknown>[]}
         />
 
-        {/* Pagination */}
-        {totalPages > 1 && (
-          <div className="flex items-center justify-between mt-4">
-            <div className="text-sm text-gray-700">
-              Showing {((currentPage - 1) * 10) + 1} to {Math.min(currentPage * 10, totalVideos)} of {totalVideos} videos
-            </div>
-            <div className="flex space-x-2">
-              <button
-                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                disabled={currentPage === 1}
-                className="px-3 py-1 text-sm border border-gray-300 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
-              >
-                Previous
-              </button>
-              <span className="px-3 py-1 text-sm bg-purple-600 text-white rounded">
-                {currentPage}
-              </span>
-              <button
-                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                disabled={currentPage === totalPages}
-                className="px-3 py-1 text-sm border border-gray-300 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
-              >
-                Next
-              </button>
-            </div>
-          </div>
-        )}
+                         {/* Pagination */}
+                 {videosData?.pagination && (
+                   <Pagination
+                     currentPage={videosData.pagination.current_page}
+                     totalPages={videosData.pagination.total_pages}
+                     totalCount={videosData.pagination.total_count}
+                     perPage={videosData.pagination.per_page}
+                     onPageChange={setCurrentPage}
+                     className="mt-4"
+                   />
+                 )}
       </div>
     </div>
   );
