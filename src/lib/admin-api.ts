@@ -6,39 +6,15 @@ import {
   PaginatedResponse,
 } from "./admin-types";
 
-// Mock data
-const mockDashboardData: DashboardData = {
-  stats: {
-    views: 12453,
-    revenue: 23671,
-    activeUsers: 256,
-    payingUsers: 2318,
-    userRetention: 85,
-  },
-  chartData: [
-    { month: "Jan", swipes: 1200, videoViews: 830, coinsUsed: 500 },
-    { month: "Feb", swipes: 1490, videoViews: 950, coinsUsed: 600 },
-    { month: "Mar", swipes: 1600, videoViews: 100, coinsUsed: 700 },
-    { month: "Apr", swipes: 1100, videoViews: 1250, coinsUsed: 800 },
-    { month: "May", swipes: 2900, videoViews: 1400, coinsUsed: 900 },
-    { month: "Jun", swipes: 2200, videoViews: 1150, coinsUsed: 1000 },
-  ],
-  recentUsers: [
-    { username: "Smith", email: "s34@gmail.com", coinBalance: 120, lastLogin: "09:30 A.M" },
-    { username: "Kavire", email: "kav@gmail.com", coinBalance: 560, lastLogin: "04/24/2025" },
-  ],
-  topVideos: [
-    { name: "Sequence A1", views: 5432 },
-    { name: "Pool A", views: 345678 },
-  ],
-};
+// Get API base URL from environment variable
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '/api/v1';
 
 // API Functions
 export const adminApi = {
   // Dashboard
   getDashboardData: async (token?: string): Promise<ApiResponse<DashboardData>> => {
     try {
-      const response = await fetch('/api/v1/admin/dashboard', {
+      const response = await fetch(`${API_BASE_URL}/admin/dashboard`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -80,7 +56,7 @@ export const adminApi = {
         params.append('search', search);
       }
 
-      const response = await fetch(`/api/v1/admin/users?${params}`, {
+      const response = await fetch(`${API_BASE_URL}/admin/users?${params}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -102,7 +78,7 @@ export const adminApi = {
 
   getUserStats: async (token?: string): Promise<ApiResponse<{ registered: number; inactive: number; newUsers: number }>> => {
     try {
-      const response = await fetch(`/api/v1/admin/users/stats`, {
+      const response = await fetch(`${API_BASE_URL}/admin/users/stats`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -149,7 +125,7 @@ export const adminApi = {
         params.append('search', search);
       }
 
-      const response = await fetch(`/api/v1/admin/videos?${params}`, {
+      const response = await fetch(`${API_BASE_URL}/admin/videos?${params}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -171,7 +147,7 @@ export const adminApi = {
 
   getVideoFilters: async (token?: string): Promise<ApiResponse<{ pools: string[]; sequences: string[] }>> => {
     try {
-      const response = await fetch('/api/v1/admin/videos/filters', {
+      const response = await fetch(`${API_BASE_URL}/admin/videos/filters`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',

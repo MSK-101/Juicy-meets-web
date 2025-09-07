@@ -1186,7 +1186,8 @@ Your browser or device does not support camera access.
       console.log('🎥 Attempting to create video stream from file ID:', videoId);
 
       // Fetch video details from backend
-      const response = await fetch(`http://localhost:3000/api/v1/videos/${videoId}/public`);
+      const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || '/api/v1';
+      const response = await fetch(`${API_BASE_URL}/videos/${videoId}/public`);
 
       if (!response.ok) {
         throw new Error(`Failed to fetch video: ${response.status}`);
