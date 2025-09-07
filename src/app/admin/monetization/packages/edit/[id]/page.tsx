@@ -2,104 +2,109 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faArrowLeft, faSave } from "@fortawesome/free-solid-svg-icons";
-
-interface Package {
-  id: string;
-  name: string;
-  coins: number;
-  price: number;
-  status: "active" | "inactive";
-}
+import { monetizationService, CoinPackage, UpdateCoinPackageRequest } from "@/api/services/monetizationService";
 
 export default function EditPackage() {
   const router = useRouter();
   const params = useParams();
   const packageId = params.id as string;
 
-  const [formData, setFormData] = useState<Package>({
-    id: "",
+  const [loading, setLoading] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [formData, setFormData] = useState<UpdateCoinPackageRequest>({
     name: "",
-    coins: 0,
     price: 0,
-    status: "active"
+    coins_count: 0,
+    description: "",
+    active: true,
+    sort_order: 0,
   });
 
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-
   useEffect(() => {
-    const fetchPackageData = async () => {
+    const fetchPackage = async () => {
       try {
-        // Mock data - replace with actual API call
-        const mockPackages: Package[] = [
-          {
-            id: "1",
-            name: "Starter Pack",
-            coins: 200,
-            price: 9.00,
-            status: "active"
-          },
-          {
-            id: "2",
-            name: "Popular Pack",
-            coins: 500,
-            price: 24.00,
-            status: "active"
-          },
-          {
-            id: "3",
-            name: "Premium Pack",
-            coins: 1000,
-            price: 39.00,
-            status: "active"
-          }
-        ];
-
-        const packageData = mockPackages.find(p => p.id === packageId);
-        if (packageData) {
-          setFormData(packageData);
-        }
+        setInitialLoading(true);
+        const packageData = await monetizationService.getCoinPackage(packageId);
+        setFormData({
+          name: packageData.name,
+          price: packageData.price,
+          coins_count: packageData.coins_count,
+          description: packageData.description || "",
+          active: packageData.active,
+          sort_order: packageData.sort_order,
+        });
       } catch (error) {
-        console.error("Failed to fetch package data:", error);
+        console.error("Failed to fetch package:", error);
+        setErrors({ general: "Failed to load package data." });
       } finally {
-        setLoading(false);
+        setInitialLoading(false);
       }
     };
 
-    fetchPackageData();
+    if (packageId) {
+      fetchPackage();
+    }
   }, [packageId]);
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { name, value } = e.target;
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value, type } = e.target;
+    const checked = (e.target as HTMLInputElement).checked;
+
     setFormData(prev => ({
       ...prev,
-      [name]: name === 'coins' || name === 'price' ? parseFloat(value) || 0 : value
+      [name]: type === 'checkbox' ? checked : (type === 'number' ? parseFloat(value) || 0 : value)
     }));
+
+    // Clear error when user starts typing
+    if (errors[name]) {
+      setErrors(prev => ({ ...prev, [name]: "" }));
+    }
+  };
+
+  const validateForm = (): boolean => {
+    const newErrors: Record<string, string> = {};
+
+    if (!formData.name?.trim()) {
+      newErrors.name = "Package name is required";
+    }
+
+    if (formData.price && formData.price <= 0) {
+      newErrors.price = "Price must be greater than 0";
+    }
+
+    if (formData.coins_count && formData.coins_count <= 0) {
+      newErrors.coins_count = "Coins count must be greater than 0";
+    }
+
+    if (formData.sort_order && formData.sort_order < 0) {
+      newErrors.sort_order = "Sort order must be 0 or greater";
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSaving(true);
 
+    if (!validateForm()) {
+      return;
+    }
+
+    setLoading(true);
     try {
-      // Mock API call - replace with actual API
-      console.log("Updated Package Data:", formData);
-
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      // Redirect back to monetization page
+      await monetizationService.updateCoinPackage(packageId, formData);
       router.push("/admin/monetization");
     } catch (error) {
-      console.error("Error updating package:", error);
+      console.error("Failed to update package:", error);
+      setErrors({ general: "Failed to update package. Please try again." });
     } finally {
-      setSaving(false);
+      setLoading(false);
     }
   };
 
-  if (loading) {
+  if (initialLoading) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
@@ -108,114 +113,148 @@ export default function EditPackage() {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-4">
+    <div className="max-w-2xl mx-auto p-6 text-black">
+      <div className="bg-white rounded-lg shadow-md p-6">
+        <div className="flex items-center justify-between mb-6">
+          <h1 className="text-2xl font-semibold text-gray-900 font-poppins">Edit Package</h1>
           <button
             onClick={() => router.back()}
-            className="flex items-center space-x-2 text-gray-600 hover:text-gray-900 transition-colors"
+            className="text-gray-500 hover:text-gray-700 transition-colors"
           >
-            <FontAwesomeIcon icon={faArrowLeft} className="w-4 h-4" />
-            <span className="font-poppins">Back</span>
+            ← Back
           </button>
-          <h1 className="text-2xl font-semibold text-gray-900 font-poppins">Edit Package</h1>
         </div>
-      </div>
 
-      {/* Form */}
-      <div className="bg-gray-100 rounded-2xl p-6 shadow-md">
+        {errors.general && (
+          <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-md">
+            <p className="text-red-600 text-sm">{errors.general}</p>
+          </div>
+        )}
+
         <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Package Name */}
-            <div className="space-y-2">
-              <label htmlFor="name" className="block text-sm font-medium text-gray-700 font-poppins">
-                Package Name
-              </label>
-              <input
-                type="text"
-                id="name"
-                name="name"
-                value={formData.name}
-                onChange={handleInputChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white text-black font-poppins"
-                placeholder="e.g., Starter Pack"
-                required
-              />
-            </div>
+          <div>
+            <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">
+              Package Name *
+            </label>
+            <input
+              type="text"
+              id="name"
+              name="name"
+              value={formData.name || ""}
+              onChange={handleInputChange}
+              className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 ${
+                errors.name ? "border-red-300" : "border-gray-300"
+              }`}
+              placeholder="Enter package name"
+            />
+            {errors.name && <p className="mt-1 text-sm text-red-600">{errors.name}</p>}
+          </div>
 
-            {/* Number of Coins */}
-            <div className="space-y-2">
-              <label htmlFor="coins" className="block text-sm font-medium text-gray-700 font-poppins">
-                Number of Coins
-              </label>
-              <input
-                type="number"
-                id="coins"
-                name="coins"
-                value={formData.coins}
-                onChange={handleInputChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white text-black font-poppins"
-                placeholder="e.g., 500"
-                min="1"
-                required
-              />
-            </div>
-
-            {/* Price */}
-            <div className="space-y-2">
-              <label htmlFor="price" className="block text-sm font-medium text-gray-700 font-poppins">
-                Price ($)
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label htmlFor="price" className="block text-sm font-medium text-gray-700 mb-2">
+                Price ($) *
               </label>
               <input
                 type="number"
                 id="price"
                 name="price"
-                value={formData.price}
+                value={formData.price || 0}
                 onChange={handleInputChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white text-black font-poppins"
-                placeholder="e.g., 24.00"
-                min="0"
                 step="0.01"
-                required
+                min="0"
+                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 ${
+                  errors.price ? "border-red-300" : "border-gray-300"
+                }`}
+                placeholder="0.00"
               />
+              {errors.price && <p className="mt-1 text-sm text-red-600">{errors.price}</p>}
             </div>
 
-            {/* Status */}
-            <div className="space-y-2">
-              <label htmlFor="status" className="block text-sm font-medium text-gray-700 font-poppins">
-                Status
+            <div>
+              <label htmlFor="coins_count" className="block text-sm font-medium text-gray-700 mb-2">
+                Coins Count *
               </label>
-              <select
-                id="status"
-                name="status"
-                value={formData.status}
+              <input
+                type="number"
+                id="coins_count"
+                name="coins_count"
+                value={formData.coins_count || 0}
                 onChange={handleInputChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white text-black font-poppins"
-                required
-              >
-                <option value="active">Active</option>
-                <option value="inactive">Inactive</option>
-              </select>
+                min="1"
+                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 ${
+                  errors.coins_count ? "border-red-300" : "border-gray-300"
+                }`}
+                placeholder="0"
+              />
+              {errors.coins_count && <p className="mt-1 text-sm text-red-600">{errors.coins_count}</p>}
             </div>
           </div>
 
-          {/* Submit Button */}
+          <div>
+            <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-2">
+              Description
+            </label>
+            <textarea
+              id="description"
+              name="description"
+              value={formData.description || ""}
+              onChange={handleInputChange}
+              rows={3}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+              placeholder="Enter package description (optional)"
+            />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label htmlFor="sort_order" className="block text-sm font-medium text-gray-700 mb-2">
+                Sort Order
+              </label>
+              <input
+                type="number"
+                id="sort_order"
+                name="sort_order"
+                value={formData.sort_order || 0}
+                onChange={handleInputChange}
+                min="0"
+                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 ${
+                  errors.sort_order ? "border-red-300" : "border-gray-300"
+                }`}
+                placeholder="0"
+              />
+              {errors.sort_order && <p className="mt-1 text-sm text-red-600">{errors.sort_order}</p>}
+            </div>
+
+            <div className="flex items-center">
+              <input
+                type="checkbox"
+                id="active"
+                name="active"
+                checked={formData.active || false}
+                onChange={handleInputChange}
+                className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
+              />
+              <label htmlFor="active" className="ml-2 block text-sm text-gray-700">
+                Active Package
+              </label>
+            </div>
+          </div>
+
           <div className="flex justify-end space-x-4 pt-6">
             <button
               type="button"
               onClick={() => router.back()}
-              className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 font-poppins hover:bg-gray-50 transition-colors"
+              className="px-4 py-2 text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 transition-colors"
             >
               Cancel
             </button>
             <button
               type="submit"
-              disabled={saving}
-              className="px-6 py-2 bg-purple-600 text-white rounded-lg font-poppins hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+              disabled={loading}
+              className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
-              <FontAwesomeIcon icon={faSave} className="w-4 h-4" />
-              <span>{saving ? "Saving..." : "Save Changes"}</span>
+              {loading ? "Updating..." : "Update Package"}
             </button>
           </div>
         </form>

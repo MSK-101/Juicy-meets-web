@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import DataTable from "@/components/admin/DataTable";
 import StatCard from "@/components/admin/StatCard";
@@ -9,36 +9,7 @@ import { faEdit, faTrash } from "@fortawesome/free-solid-svg-icons";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
 } from 'recharts';
-
-interface CoinPackage {
-  id: string;
-  name: string;
-  coins: number;
-  price: number;
-  status: "active" | "inactive";
-}
-
-interface Transaction {
-  id: string;
-  user: string;
-  package: string;
-  amount: number;
-  date: string;
-}
-
-interface MonetizationData {
-  stats: {
-    totalRevenue: number;
-    revenuePerPackage: number;
-    mostPopularPackage: string;
-  };
-  coinPackages: CoinPackage[];
-  transactions: Transaction[];
-  chartData: Array<{
-    name: string;
-    revenue: number;
-  }>;
-}
+import { monetizationService, MonetizationData } from "@/api/services/monetizationService";
 
 export default function Monetization() {
   const router = useRouter();
@@ -46,131 +17,60 @@ export default function Monetization() {
   const [loading, setLoading] = useState(true);
   const [dateFilter, setDateFilter] = useState("today");
   const [transactionDateFilter, setTransactionDateFilter] = useState("today");
+  const dataLoadedRef = useRef(false);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // Mock data - replace with actual API call
-        const mockData: MonetizationData = {
-          stats: {
-            totalRevenue: 2453,
-            revenuePerPackage: 23671,
-            mostPopularPackage: "500 coins"
-          },
-          coinPackages: [
-            {
-              id: "1",
-              name: "Starter Pack",
-              coins: 200,
-              price: 9.00,
-              status: "active"
-            },
-            {
-              id: "2",
-              name: "Popular Pack",
-              coins: 500,
-              price: 24.00,
-              status: "active"
-            },
-            {
-              id: "3",
-              name: "Premium Pack",
-              coins: 1000,
-              price: 39.00,
-              status: "active"
-            },
-            {
-              id: "4",
-              name: "Basic Pack",
-              coins: 100,
-              price: 5.00,
-              status: "inactive"
-            },
-            {
-              id: "5",
-              name: "Deluxe Pack",
-              coins: 750,
-              price: 29.00,
-              status: "active"
-            },
-            {
-              id: "6",
-              name: "Ultimate Pack",
-              coins: 1500,
-              price: 59.00,
-              status: "active"
-            }
-          ],
-          transactions: [
-            {
-              id: "1",
-              user: "John Doe",
-              package: "500 Coins",
-              amount: 24,
-              date: "02/08/2025"
-            },
-            {
-              id: "2",
-              user: "Sarah Smith",
-              package: "1000 Coins",
-              amount: 39,
-              date: "02/07/2025"
-            },
-            {
-              id: "3",
-              user: "Mike Johnson",
-              package: "200 Coins",
-              amount: 9,
-              date: "02/06/2025"
-            },
-            {
-              id: "4",
-              user: "Emily Davis",
-              package: "500 Coins",
-              amount: 24,
-              date: "02/05/2025"
-            },
-            {
-              id: "5",
-              user: "David Wilson",
-              package: "1000 Coins",
-              amount: 39,
-              date: "02/04/2025"
-            }
-          ],
-          chartData: [
-            { name: "100 Coins", revenue: 15 },
-            { name: "250 Coins", revenue: 28 },
-            { name: "180 Coins", revenue: 22 },
-            { name: "300 Coins", revenue: 35 },
-            { name: "80 Coins", revenue: 12 },
-            { name: "220 Coins", revenue: 26 }
-          ]
-        };
-
-        setData(mockData);
+        console.log("🔄 Fetching monetization data for dateFilter:", dateFilter);
+        setLoading(true);
+        dataLoadedRef.current = false;
+        const monetizationData = await monetizationService.getMonetizationData(dateFilter);
+        console.log("✅ Monetization data fetched successfully");
+        setData(monetizationData);
+        dataLoadedRef.current = true;
       } catch (error) {
-        console.error("Failed to fetch monetization data:", error);
+        console.error("❌ Failed to fetch monetization data:", error);
       } finally {
         setLoading(false);
       }
     };
 
     fetchData();
-  }, [dateFilter, transactionDateFilter]);
+  }, [dateFilter]);
+
+  useEffect(() => {
+    const fetchTransactions = async () => {
+      if (!dataLoadedRef.current) {
+        console.log("⏳ Skipping transaction fetch - data not loaded yet");
+        return;
+      }
+
+      try {
+        console.log("🔄 Fetching transactions for transactionDateFilter:", transactionDateFilter);
+        const transactions = await monetizationService.getTransactionHistory(transactionDateFilter);
+        console.log("✅ Transactions fetched successfully");
+        setData(prev => prev ? { ...prev, transactions } : null);
+      } catch (error) {
+        console.error("❌ Failed to fetch transaction data:", error);
+      }
+    };
+
+    fetchTransactions();
+  }, [transactionDateFilter]);
 
   const coinPackageColumns = [
     { key: "name", label: "Name of Package" },
-    { key: "coins", label: "Coins" },
+    { key: "coins_count", label: "Coins" },
     { key: "price", label: "Price" },
     {
-      key: "status",
+      key: "active",
       label: "Status",
       render: (value: unknown) => (
         <div className="flex items-center space-x-2">
-          <div className={`w-2 h-2 rounded-full ${value === 'active' ? 'bg-green-500' : 'bg-gray-400'}`}></div>
-          <span className={`text-sm ${value === 'active' ? 'text-green-600' : 'text-gray-500'}`}>
-            {value === 'active' ? 'Active' : 'Inactive'}
+          <div className={`w-2 h-2 rounded-full ${value === true ? 'bg-green-500' : 'bg-gray-400'}`}></div>
+          <span className={`text-sm ${value === true ? 'text-green-600' : 'text-gray-500'}`}>
+            {value === true ? 'Active' : 'Inactive'}
           </span>
         </div>
       )
@@ -187,7 +87,7 @@ export default function Monetization() {
             <FontAwesomeIcon icon={faEdit} className="w-4 h-4" />
           </button>
           <button
-            onClick={() => console.log("Delete package:", row.id)}
+            onClick={() => handleDeletePackage(row.id as string)}
             className="text-red-600 hover:text-red-700 transition-colors"
           >
             <FontAwesomeIcon icon={faTrash} className="w-4 h-4" />
@@ -198,15 +98,33 @@ export default function Monetization() {
   ];
 
   const transactionColumns = [
-    { key: "user", label: "User" },
-    { key: "package", label: "Package" },
+    { key: "user_email", label: "User" },
+    { key: "package_name", label: "Package" },
     {
-      key: "amount",
+      key: "price",
       label: "Amount",
       render: (value: unknown) => `$${value}`
     },
-    { key: "date", label: "Date" },
+    {
+      key: "purchased_at",
+      label: "Date",
+      render: (value: unknown) => new Date(value as string).toLocaleDateString()
+    },
   ];
+
+  const handleDeletePackage = async (packageId: string) => {
+    if (window.confirm("Are you sure you want to delete this package? This action cannot be undone.")) {
+      try {
+        await monetizationService.deleteCoinPackage(packageId);
+        // Refresh data after deletion
+        const monetizationData = await monetizationService.getMonetizationData(dateFilter);
+        setData(monetizationData);
+      } catch (error) {
+        console.error("Failed to delete package:", error);
+        alert("Failed to delete package. Please try again.");
+      }
+    }
+  };
 
   if (loading) {
     return (
@@ -241,21 +159,21 @@ export default function Monetization() {
       <div className="flex gap-4 lg:gap-6 items-center">
         <StatCard
           title="Total Revenue"
-          value={`$${data.stats.totalRevenue.toLocaleString()}`}
+          value={`$${data.stats.total_revenue.toLocaleString()}`}
           change="+11.01%"
           isPositive={true}
           index={0}
         />
         <StatCard
           title="Revenue Per Coin Package"
-          value={`$${data.stats.revenuePerPackage.toLocaleString()}`}
+          value={`$${data.stats.revenue_per_package.toLocaleString()}`}
           change="-0.03%"
           isPositive={false}
           index={1}
         />
         <StatCard
           title="Most Popular Package"
-          value={data.stats.mostPopularPackage}
+          value={data.stats.most_popular_package || "N/A"}
           change="+15.03%"
           isPositive={true}
           index={2}
@@ -278,7 +196,7 @@ export default function Monetization() {
           <div className="h-64 overflow-y-auto">
             <DataTable
               columns={coinPackageColumns}
-              data={data.coinPackages as unknown as Record<string, unknown>[]}
+              data={data.coin_packages as unknown as Record<string, unknown>[]}
             />
           </div>
         </div>
@@ -289,7 +207,7 @@ export default function Monetization() {
           <div className="h-64">
             <ResponsiveContainer width="100%" height={300}>
               <BarChart
-                data={data.chartData}
+                data={data.chart_data}
                 margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
               >
                 <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
