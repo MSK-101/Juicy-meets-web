@@ -137,15 +137,32 @@ export default function VideoChatPage() {
 
   // Centralized swipe handler for both touch and button
   const handleSwipeToNext = async () => {
-    await nextSwipe(
-      setConnectionState,
-      setError,
-      setIsVideoPlaying,
-      setCurrentVideoId,
-      setCurrentVideoUrl,
-      setCurrentVideoName,
-      setMessages
-    );
+    try {
+      const result = await nextSwipe(
+        setConnectionState,
+        setError,
+        setIsVideoPlaying,
+        setCurrentVideoId,
+        setCurrentVideoUrl,
+        setCurrentVideoName,
+        setMessages
+      );
+
+      // Handle per-swipe deduction result
+      if (result?.swipe_deduction) {
+        const deduction = result.swipe_deduction;
+        if (deduction.success && deduction.deducted > 0) {
+          // Update coin balance
+          setCoinBalance(deduction.new_balance);
+          userService.updateUserCoinBalance(deduction.new_balance);
+          console.log(`💰 Per-swipe deduction applied: ${deduction.deducted} coins, new balance: ${deduction.new_balance}`);
+        } else if (!deduction.success) {
+          console.warn(`⚠️ Per-swipe deduction failed: ${deduction.error}`);
+        }
+      }
+    } catch (error) {
+      console.error('❌ Error during swipe:', error);
+    }
   };
 
   // Handle video end
@@ -200,12 +217,13 @@ export default function VideoChatPage() {
 
       // Show notification for deduction
       if (result.deducted > 0) {
-        // Deduction applied successfully - no notification needed
+        console.log(`💰 Coin deduction applied: ${result.deducted} coins, new balance: ${result.new_balance}`);
       }
     };
 
-    const handleCoinDeductionError = () => {
-      // Error occurred but no notification needed
+    const handleCoinDeductionError = (event: CustomEvent) => {
+      const result = event.detail;
+      console.warn(`⚠️ Coin deduction failed: ${result.error}`);
     };
 
     window.addEventListener('coinDeductionApplied', handleCoinDeduction as EventListener);

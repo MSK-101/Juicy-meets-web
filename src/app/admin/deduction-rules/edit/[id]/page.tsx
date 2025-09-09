@@ -21,23 +21,31 @@ export default function EditDeductionRulePage() {
   const [thresholdSeconds, setThresholdSeconds] = useState<string>("");
   const [coins, setCoins] = useState<string>("");
   const [active, setActive] = useState<boolean>(true);
+  const [deductionType, setDeductionType] = useState<'duration' | 'per_swipe'>('duration');
 
   useEffect(() => {
     const rule = data?.data?.deduction_rule;
     if (rule) {
       setName(rule.name || "");
-      setThresholdSeconds(String(rule.threshold_seconds));
+      setThresholdSeconds(String(rule.threshold_seconds || ""));
       setCoins(String(rule.coins));
       setActive(rule.active);
+      setDeductionType(rule.deduction_type || 'duration');
     }
   }, [data]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const threshold = parseInt(thresholdSeconds, 10);
+    const threshold = deductionType === 'duration' ? parseInt(thresholdSeconds, 10) : null;
     const coinsNum = parseInt(coins, 10);
     mutate(
-      { name, threshold_seconds: threshold, coins: coinsNum, active },
+      {
+        name,
+        threshold_seconds: threshold,
+        coins: coinsNum,
+        active,
+        deduction_type: deductionType
+      },
       {
         onSuccess: () => {
           setToast({ message: "Rule updated successfully", type: "success", isVisible: true });
@@ -64,6 +72,18 @@ export default function EditDeductionRulePage() {
       <h1 className="text-2xl font-bold text-gray-900 text-center">Edit Deduction Rule</h1>
       <form onSubmit={handleSubmit} className="bg-gray-100 rounded-2xl p-6 shadow-md space-y-4 w-full max-w-4xl mx-auto">
         <div>
+          <label className="block text-sm font-medium text-gray-700">Deduction Type</label>
+          <select
+            value={deductionType}
+            onChange={(e) => setDeductionType(e.target.value as 'duration' | 'per_swipe')}
+            className="mt-1 block w-full py-1 px-2 rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 bg-white text-black font-poppins"
+            required
+          >
+            <option value="duration">Duration-based (deducts at specific time intervals)</option>
+            <option value="per_swipe">Per Swipe (deducts on each successful swipe)</option>
+          </select>
+        </div>
+        <div>
           <label className="block text-sm font-medium text-gray-700">Name (optional)</label>
           <input
             type="text"
@@ -72,17 +92,19 @@ export default function EditDeductionRulePage() {
             className="mt-1 block w-full rounded-md border-gray-300 py-1 px-2 shadow-sm focus:border-purple-500 focus:ring-purple-500 bg-white text-black font-poppins"
           />
         </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700">Threshold seconds</label>
-          <input
-            type="number"
-            min={1}
-            value={thresholdSeconds}
-            onChange={(e) => setThresholdSeconds(e.target.value)}
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm py-1 px-2  focus:border-purple-500 focus:ring-purple-500 bg-white text-black font-poppins"
-            required
-          />
-        </div>
+        {deductionType === 'duration' && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Threshold seconds</label>
+            <input
+              type="number"
+              min={1}
+              value={thresholdSeconds}
+              onChange={(e) => setThresholdSeconds(e.target.value)}
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm py-1 px-2  focus:border-purple-500 focus:ring-purple-500 bg-white text-black font-poppins"
+              required
+            />
+          </div>
+        )}
         <div>
           <label className="block text-sm font-medium text-gray-700">Coins</label>
           <input

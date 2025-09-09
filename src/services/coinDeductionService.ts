@@ -5,6 +5,7 @@ export interface DeductionRule {
   name: string;
   threshold_seconds: number;
   coins: number;
+  deduction_type: 'duration' | 'per_swipe';
 }
 
 export interface DeductionResult {
@@ -67,6 +68,13 @@ class CoinDeductionService {
     if (!this.chatStartTime) return;
 
     const currentDuration = Math.floor((Date.now() - this.chatStartTime) / 1000);
+
+    // Check if user has coins before attempting deduction
+    const currentBalance = await this.getUserBalance();
+    if (currentBalance <= 0) {
+      console.log('💰 User has no coins, skipping duration-based deductions');
+      return;
+    }
 
     // Check each rule to see if we've reached the threshold
     for (const rule of this.activeRules) {

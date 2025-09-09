@@ -27,7 +27,10 @@ export default function DeductionRulesPage() {
   };
 
   const columns = [
-    { key: "threshold_seconds", label: "Threshold (s)" },
+    { key: "deduction_type", label: "Type", render: (value: unknown) => value === 'per_swipe' ? 'Per Swipe' : 'Duration' },
+    { key: "threshold_seconds", label: "Threshold (s)", render: (value: unknown, row: Record<string, unknown>) =>
+      row.deduction_type === 'per_swipe' ? 'N/A' : value
+    },
     { key: "coins", label: "Coins" },
     { key: "name", label: "Name" },
     {
@@ -130,10 +133,3 @@ export default function DeductionRulesPage() {
     </div>
   );
 }
-
-
-
-
-
-
-
