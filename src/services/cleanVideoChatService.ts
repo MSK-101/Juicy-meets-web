@@ -382,6 +382,12 @@ export class CleanVideoChatService {
       videos_watched_in_current_sequence: number;
       sequence_total_videos: number;
     };
+    swipe_deduction?: {
+      success: boolean;
+      deducted: number;
+      new_balance: number;
+      error?: string;
+    };
   }> {
     // Allow immediate swipes for video matches (no debounce)
     const isVideoMatch = this.currentRoomId && this.partnerId === 'video';
@@ -572,7 +578,8 @@ export class CleanVideoChatService {
             videoUrl: responseData.video_url || '',
             videoName: responseData.video_name || 'Video',
             sessionVersion: responseData.session_version,
-            updatedUserInfo: responseData.updated_user_info
+            updatedUserInfo: responseData.updated_user_info,
+            swipe_deduction: (responseData as any).swipe_deduction
           };
         } else if (actualMatchType === 'staff') {
           return {
@@ -581,7 +588,8 @@ export class CleanVideoChatService {
             matchType: 'staff',
             partnerId: responseData.partner.id,
             sessionVersion: responseData.session_version,
-            updatedUserInfo: responseData.updated_user_info
+            updatedUserInfo: responseData.updated_user_info,
+            swipe_deduction: (responseData as any).swipe_deduction
           };
         } else if (actualMatchType === 'real_user') {
           return {
@@ -590,7 +598,8 @@ export class CleanVideoChatService {
             matchType: 'real_user',
             partnerId: responseData.partner.id,
             sessionVersion: responseData.session_version,
-            updatedUserInfo: responseData.updated_user_info
+            updatedUserInfo: responseData.updated_user_info,
+            swipe_deduction: (responseData as any).swipe_deduction
           };
         } else {
           console.warn('⚠️ Unknown match type, treating as failed match');

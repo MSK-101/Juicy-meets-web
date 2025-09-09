@@ -3,9 +3,10 @@ import { adminApi } from "../adminBaseAPI";
 export interface DeductionRule {
   id: number;
   name?: string;
-  threshold_seconds: number;
+  threshold_seconds?: number;
   coins: number;
   active: boolean;
+  deduction_type: 'duration' | 'per_swipe';
   created_at: string;
   updated_at: string;
 }
@@ -22,9 +23,10 @@ export interface DeductionRulesListResponse {
 
 export interface CreateDeductionRuleRequest {
   name?: string;
-  threshold_seconds: number;
+  threshold_seconds?: number;
   coins: number;
   active?: boolean;
+  deduction_type: 'duration' | 'per_swipe';
 }
 
 export interface UpdateDeductionRuleRequest {
@@ -32,6 +34,7 @@ export interface UpdateDeductionRuleRequest {
   threshold_seconds?: number;
   coins?: number;
   active?: boolean;
+  deduction_type?: 'duration' | 'per_swipe';
 }
 
 export const deductionRulesService = {

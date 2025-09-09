@@ -36,15 +36,15 @@ export default function EditDeductionRulePage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const threshold = deductionType === 'duration' ? parseInt(thresholdSeconds, 10) : null;
+    const threshold = deductionType === 'duration' ? parseInt(thresholdSeconds, 10) : undefined;
     const coinsNum = parseInt(coins, 10);
     mutate(
-      {
-        name,
-        threshold_seconds: threshold,
-        coins: coinsNum,
-        active,
-        deduction_type: deductionType
+      { 
+        name, 
+        threshold_seconds: threshold, 
+        coins: coinsNum, 
+        active, 
+        deduction_type: deductionType 
       },
       {
         onSuccess: () => {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useDeductionRules } from "@/api";
 import DataTable from "@/components/admin/DataTable";
@@ -27,21 +27,21 @@ export default function DeductionRulesPage() {
   };
 
   const columns = [
-    { key: "deduction_type", label: "Type", render: (value: unknown) => value === 'per_swipe' ? 'Per Swipe' : 'Duration' },
-    { key: "threshold_seconds", label: "Threshold (s)", render: (value: unknown, row: Record<string, unknown>) =>
-      row.deduction_type === 'per_swipe' ? 'N/A' : value
+    { key: "deduction_type", label: "Type", render: (value: unknown): React.ReactNode => value === 'per_swipe' ? 'Per Swipe' : 'Duration' },
+    { key: "threshold_seconds", label: "Threshold (s)", render: (value: unknown, row: Record<string, unknown>): React.ReactNode => 
+      row.deduction_type === 'per_swipe' ? 'N/A' : String(value)
     },
     { key: "coins", label: "Coins" },
     { key: "name", label: "Name" },
     {
       key: "active",
       label: "Active",
-      render: (value: unknown) => (value ? "Yes" : "No"),
+      render: (value: unknown): React.ReactNode => (value ? "Yes" : "No"),
     },
     {
       key: "actions",
       label: "Actions",
-      render: (_: unknown, row: Record<string, unknown>) => (
+      render: (_: unknown, row: Record<string, unknown>): React.ReactNode => (
         <button
           onClick={() => router.push(`/admin/deduction-rules/edit/${row.id}`)}
           className="inline-flex items-center px-2 py-1 text-sm text-purple-600 hover:text-purple-700 hover:bg-purple-50 rounded transition-colors"
