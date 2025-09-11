@@ -78,20 +78,26 @@ export class UserService {
   }
 
   // Validate JWT token
-  static async validateToken(token: string): Promise<{ valid: boolean; user?: User; message: string }> {
+  static async validateToken(token: string, email?: string): Promise<{ valid: boolean; user?: User; token?: string; message: string }> {
     try {
       const response = await fetch(`${BASE_URL}/users/validate_token`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
-        }
+        },
+        body: JSON.stringify({ email })
       });
 
       const data = await response.json();
 
       if (response.ok && data.valid) {
-        return { valid: true, user: data.user, message: data.message };
+        return {
+          valid: true,
+          user: data.user,
+          token: data.token, // Include new token if auto-login occurred
+          message: data.message
+        };
       } else {
         return { valid: false, message: data.message || 'Token validation failed' };
       }

@@ -155,7 +155,19 @@ export class CleanVideoChatService {
                 console.log('🔍 Validating token (cooldown respected)...');
                 lastValidationAttempt = Date.now();
 
-                const validation = await UserService.validateToken(token);
+                // Get user email for auto-login fallback
+                let userEmail: string | undefined;
+                try {
+                  const storedUser = localStorage.getItem('juicyMeetsUser');
+                  if (storedUser) {
+                    const userData = JSON.parse(storedUser);
+                    userEmail = userData.email;
+                  }
+                } catch (error) {
+                  console.warn('Could not get user email for token validation:', error);
+                }
+
+                const validation = await UserService.validateToken(token, userEmail);
 
                 // Cache the validation result
                 this.tokenValidationCache = {
@@ -166,6 +178,13 @@ export class CleanVideoChatService {
 
                 if (validation.valid) {
                   console.log('✅ Token validation successful');
+
+                  // If a new token was provided (auto-login), update localStorage
+                  if (validation.token) {
+                    localStorage.setItem('juicyMeetsAuthToken', validation.token);
+                    console.log('🔄 Token refreshed via auto-login in video chat service');
+                  }
+
                   return userId;
                 } else {
                   console.warn('⚠️ Token validation failed, clearing storage');

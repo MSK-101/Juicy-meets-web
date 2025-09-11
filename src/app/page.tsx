@@ -42,10 +42,17 @@ export default function Home() {
       const token = localStorage.getItem('juicyMeetsAuthToken');
       if (token) {
         try {
-          const validation = await UserService.validateToken(token);
+          const validation = await UserService.validateToken(token, storedUser.email);
           if (validation.valid && validation.user) {
             // Token is valid, update auth store and go to chat
             setUser(validation.user);
+
+            // If a new token was provided (auto-login), update localStorage
+            if (validation.token) {
+              localStorage.setItem('juicyMeetsAuthToken', validation.token);
+              console.log('🔄 Token refreshed via auto-login');
+            }
+
             startChat();
             return;
           } else {
