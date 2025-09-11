@@ -20,6 +20,7 @@ export const apiRequest = async (
 ): Promise<unknown> => {
   const user = useAuthStore.getState().user;
   let token = user?.token;
+  let userEmail: string | undefined;
 
   console.log('🔍 API Request Debug:', { endpoint, hasUserToken: !!user?.token, hasUser: !!user });
 
@@ -36,10 +37,52 @@ export const apiRequest = async (
     }
   }
 
+  // Get user email for auto-login fallback
+  if (user?.email) {
+    userEmail = user.email;
+  } else {
+    try {
+      const storedUser = localStorage.getItem('juicyMeetsUser');
+      if (storedUser) {
+        const userData = JSON.parse(storedUser);
+        userEmail = userData.email;
+      }
+    } catch {
+      console.warn('Could not access localStorage for user email');
+    }
+  }
+
   console.log('🔍 Final token for request:', token ? 'Present' : 'Missing');
+  console.log('🔍 User email for auto-login:', userEmail ? 'Present' : 'Missing');
+
+  // Prepare request body with email for auto-login
+  let requestBody = options.body;
+  if (userEmail) {
+    if (options.method === 'POST' && requestBody) {
+      try {
+        const bodyData = typeof requestBody === 'string' ? JSON.parse(requestBody) : requestBody;
+        bodyData.email = userEmail;
+        requestBody = JSON.stringify(bodyData);
+      } catch (error) {
+        console.warn('Could not add email to request body:', error);
+      }
+    } else if (options.method === 'POST' && !requestBody) {
+      // If no body exists, create one with just the email
+      requestBody = JSON.stringify({ email: userEmail });
+    } else if (['GET', 'PUT', 'PATCH', 'DELETE'].includes(options.method || 'GET')) {
+      // For non-POST requests, add email as query parameter
+      const url = new URL(`${BASE_URL}${endpoint}`);
+      url.searchParams.set('email', userEmail);
+      // We'll need to update the endpoint to include the query params
+      const modifiedEndpoint = `${endpoint}${endpoint.includes('?') ? '&' : '?'}email=${encodeURIComponent(userEmail)}`;
+      // Update the endpoint for the final request
+      endpoint = modifiedEndpoint;
+    }
+  }
 
   const config: RequestInit = {
     ...options,
+    body: requestBody,
     headers: {
       "Content-Type": "application/json",
       Accept: "application/json",
