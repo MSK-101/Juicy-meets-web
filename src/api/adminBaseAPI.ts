@@ -77,6 +77,16 @@ export const adminApiRequest = async <T = unknown>(
     const isJSON = contentType?.includes("application/json");
     const data = isJSON ? await response.json() : await response.text();
 
+    // Check for new token in response headers (auto-login token refresh)
+    const newToken = response.headers.get("X-New-Token");
+    if (newToken) {
+      console.log("🔄 Received new token from auto-login, updating store");
+      const { setAdmin } = useAdminAuthStore.getState();
+      if (adminAuth.admin) {
+        setAdmin(adminAuth.admin, newToken);
+      }
+    }
+
     if (!response.ok) {
       throw new AdminAPIError(
         data?.message || data || "An error occurred",

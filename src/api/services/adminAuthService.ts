@@ -81,4 +81,66 @@ export const adminAuthService = {
       throw error;
     }
   },
+
+  // Admin Management
+  changePassword: async (oldPassword: string, newPassword: string): Promise<void> => {
+    try {
+      const response = await adminApi.put("/admin/auth/change_password", {
+        old_password: oldPassword,
+        new_password: newPassword
+      }) as {
+        success: boolean;
+        message?: string;
+      };
+
+      if (!response?.success) {
+        throw new Error(response?.message || "Failed to change password");
+      }
+    } catch (error) {
+      console.error("Change password error:", error);
+      throw error;
+    }
+  },
+
+  getAdmins: async (): Promise<Admin[]> => {
+    try {
+      const response = await adminApi.get("/admin/admins") as {
+        success: boolean;
+        data: { admins: Admin[] };
+      };
+
+      if (response?.success && response?.data?.admins) {
+        return response.data.admins;
+      } else {
+        throw new Error("Failed to get admins");
+      }
+    } catch (error) {
+      console.error("Get admins error:", error);
+      throw error;
+    }
+  },
+
+  createAdmin: async (email: string, password: string): Promise<Admin> => {
+    try {
+      const response = await adminApi.post("/admin/admins", {
+        admin: {
+          email,
+          password,
+          password_confirmation: password
+        }
+      }) as {
+        success: boolean;
+        data: { admin: Admin };
+      };
+
+      if (response?.success && response?.data?.admin) {
+        return response.data.admin;
+      } else {
+        throw new Error("Failed to create admin");
+      }
+    } catch (error) {
+      console.error("Create admin error:", error);
+      throw error;
+    }
+  },
 };

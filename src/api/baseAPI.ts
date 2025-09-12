@@ -103,6 +103,27 @@ export const apiRequest = async (
 
     console.log('🔍 Response status:', response.status, 'for endpoint:', endpoint);
 
+    // Check for new token in response headers (auto-login token refresh)
+    const newToken = response.headers.get("X-New-Token");
+    if (newToken) {
+      console.log("🔄 Received new token from auto-login, updating store");
+      const { setUser } = useAuthStore.getState();
+      if (user) {
+        setUser({ ...user, token: newToken });
+      }
+    }
+
+    // Also check for new token in response body (for validate_token endpoint)
+    if (isJSON && data && typeof data === 'object' && 'token' in data && data.token) {
+      console.log("🔄 Received new token in response body, updating store");
+      const { setUser } = useAuthStore.getState();
+      if (user) {
+        setUser({ ...user, token: data.token });
+      }
+      // Also update localStorage
+      localStorage.setItem('juicyMeetsAuthToken', data.token);
+    }
+
     if (!response.ok) {
       useErrorStore.getState().setError(data?.message || data || "An error occurred");
       throw new APIError(data?.message || data || "An error occurred", response.status, data);

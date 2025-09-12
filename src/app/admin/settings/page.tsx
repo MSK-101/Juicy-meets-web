@@ -1,16 +1,19 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import DataTable from "@/components/admin/DataTable";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faEdit, faPlus, faEye, faEyeSlash } from "@fortawesome/free-solid-svg-icons";
+import { useAdminAuthStore } from "@/store/adminAuth";
+import { adminAuthService } from "@/api/services/adminAuthService";
 
-interface TeamMember {
-  id: string;
-  fullName: string;
+interface Admin {
+  id: number;
   email: string;
-  role: "Administrator" | "Moderator" | "Viewer";
-  status: "active" | "inactive";
+  display_name: string;
+  role: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 interface PasswordFormData {
@@ -19,19 +22,15 @@ interface PasswordFormData {
   confirmPassword: string;
 }
 
-interface NewUserFormData {
+interface NewAdminFormData {
   email: string;
   password: string;
   confirmPassword: string;
-  role: "Administrator" | "Moderator" | "Viewer";
 }
 
 export default function Settings() {
-  // Current user data - replace with actual user data from context/API
-  const currentUser = {
-    name: "John Doe",
-    email: "john.doe@example.com"
-  };
+  // Get current admin from store
+  const { admin: currentAdmin, token } = useAdminAuthStore();
 
   // Password change state
   const [passwordData, setPasswordData] = useState<PasswordFormData>({
@@ -44,42 +43,41 @@ export default function Settings() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [passwordLoading, setPasswordLoading] = useState(false);
 
-  // New user state
-  const [newUserData, setNewUserData] = useState<NewUserFormData>({
+  // New admin state
+  const [newAdminData, setNewAdminData] = useState<NewAdminFormData>({
     email: "",
     password: "",
-    confirmPassword: "",
-    role: "Administrator"
+    confirmPassword: ""
   });
-  const [showNewUserPassword, setShowNewUserPassword] = useState(false);
-  const [showNewUserConfirmPassword, setShowNewUserConfirmPassword] = useState(false);
-  const [newUserLoading, setNewUserLoading] = useState(false);
-  const [showNewUserForm, setShowNewUserForm] = useState(false);
+  const [showNewAdminPassword, setShowNewAdminPassword] = useState(false);
+  const [showNewAdminConfirmPassword, setShowNewAdminConfirmPassword] = useState(false);
+  const [newAdminLoading, setNewAdminLoading] = useState(false);
+  const [showNewAdminForm, setShowNewAdminForm] = useState(false);
 
-  // Team members state
-  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([
-    {
-      id: "1",
-      fullName: "John Smith",
-      email: "john.smith@example.com",
-      role: "Administrator",
-      status: "active"
-    },
-    {
-      id: "2",
-      fullName: "Kay Will",
-      email: "kay.will@example.com",
-      role: "Administrator",
-      status: "active"
-    },
-    {
-      id: "3",
-      fullName: "Sarah Johnson",
-      email: "sarah.johnson@example.com",
-      role: "Moderator",
-      status: "active"
+  // Admins state
+  const [admins, setAdmins] = useState<Admin[]>([]);
+  const [adminsLoading, setAdminsLoading] = useState(false);
+
+  // Load admins on component mount
+  useEffect(() => {
+    loadAdmins();
+  }, []);
+
+  const loadAdmins = async () => {
+    setAdminsLoading(true);
+    try {
+      const adminsData = await adminAuthService.getAdmins();
+      setAdmins(adminsData);
+    } catch (error) {
+      console.error("Error loading admins:", error);
+      // Fallback to current admin if API fails
+      if (currentAdmin) {
+        setAdmins([currentAdmin]);
+      }
+    } finally {
+      setAdminsLoading(false);
     }
-  ]);
+  };
 
   const handlePasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -89,9 +87,9 @@ export default function Settings() {
     }));
   };
 
-  const handleNewUserChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+  const handleNewAdminChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setNewUserData(prev => ({
+    setNewAdminData(prev => ({
       ...prev,
       [name]: value
     }));
@@ -108,11 +106,7 @@ export default function Settings() {
         return;
       }
 
-      // Mock API call - replace with actual API
-      console.log("Password change data:", passwordData);
-
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await adminAuthService.changePassword(passwordData.oldPassword, passwordData.newPassword);
 
       // Reset form
       setPasswordData({
@@ -130,66 +124,47 @@ export default function Settings() {
     }
   };
 
-  const handleNewUserSubmit = async (e: React.FormEvent) => {
+  const handleNewAdminSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setNewUserLoading(true);
+    setNewAdminLoading(true);
 
     try {
       // Validate passwords match
-      if (newUserData.password !== newUserData.confirmPassword) {
+      if (newAdminData.password !== newAdminData.confirmPassword) {
         alert("Passwords do not match!");
         return;
       }
 
-      // Mock API call - replace with actual API
-      console.log("New user data:", newUserData);
-
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      // Add new user to team members
-      const newMember: TeamMember = {
-        id: Date.now().toString(),
-        fullName: newUserData.email.split('@')[0], // Use email prefix as name
-        email: newUserData.email,
-        role: newUserData.role,
-        status: "active"
-      };
-
-      setTeamMembers(prev => [...prev, newMember]);
+      const newAdmin = await adminAuthService.createAdmin(newAdminData.email, newAdminData.password);
+      setAdmins(prev => [...prev, newAdmin]);
 
       // Reset form
-      setNewUserData({
+      setNewAdminData({
         email: "",
         password: "",
-        confirmPassword: "",
-        role: "Administrator"
+        confirmPassword: ""
       });
-      setShowNewUserForm(false);
+      setShowNewAdminForm(false);
 
-      alert("New team member added successfully!");
+      alert("New admin added successfully!");
     } catch (error) {
-      console.error("Error adding new user:", error);
-      alert("Failed to add new user. Please try again.");
+      console.error("Error adding new admin:", error);
+      alert("Failed to add new admin. Please try again.");
     } finally {
-      setNewUserLoading(false);
+      setNewAdminLoading(false);
     }
   };
 
-  const teamMemberColumns = [
-    { key: "fullName", label: "Full Name" },
+  const adminColumns = [
+    { key: "display_name", label: "Name" },
     { key: "email", label: "Email" },
-    { key: "role", label: "Role" },
     {
-      key: "status",
-      label: "Status",
+      key: "created_at",
+      label: "Created",
       render: (value: unknown) => (
-        <div className="flex items-center space-x-2">
-          <div className={`w-2 h-2 rounded-full ${value === 'active' ? 'bg-green-500' : 'bg-gray-400'}`}></div>
-          <span className={`text-sm ${value === 'active' ? 'text-green-600' : 'text-gray-500'}`}>
-            {value === 'active' ? 'Active' : 'Inactive'}
-          </span>
-        </div>
+        <span className="text-sm text-gray-600">
+          {new Date(value as string).toLocaleDateString()}
+        </span>
       )
     },
     {
@@ -197,7 +172,7 @@ export default function Settings() {
       label: "Actions",
       render: (_value: unknown, row: Record<string, unknown>) => (
         <button
-          onClick={() => console.log("Edit team member:", row.id)}
+          onClick={() => console.log("Edit admin:", row.id)}
           className="text-purple-600 hover:text-purple-700 transition-colors"
         >
           <FontAwesomeIcon icon={faEdit} className="w-4 h-4" />
@@ -220,7 +195,7 @@ export default function Settings() {
       <div className="bg-white rounded-2xl p-8 shadow-lg border border-gray-100">
         <div className="flex items-center space-x-4 mb-6">
           <div className="w-12 h-12 bg-purple-600 rounded-full flex items-center justify-center">
-            <span className="text-white font-bold text-lg">{currentUser.name.charAt(0)}</span>
+            <span className="text-white font-bold text-lg">{currentAdmin?.display_name?.charAt(0) || "A"}</span>
           </div>
           <div>
             <h2 className="text-xl font-semibold text-gray-900 font-poppins">Current User</h2>
@@ -230,11 +205,15 @@ export default function Settings() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="space-y-2">
             <label className="text-sm font-medium text-gray-500 font-poppins uppercase tracking-wide">Name</label>
-            <p className="text-lg font-semibold text-gray-900 font-poppins">{currentUser.name}</p>
+            <p className="text-lg font-semibold text-gray-900 font-poppins">
+              {currentAdmin?.display_name || "Loading..."}
+            </p>
           </div>
           <div className="space-y-2">
             <label className="text-sm font-medium text-gray-500 font-poppins uppercase tracking-wide">Email</label>
-            <p className="text-lg font-semibold text-gray-900 font-poppins">{currentUser.email}</p>
+            <p className="text-lg font-semibold text-gray-900 font-poppins">
+              {currentAdmin?.email || "Loading..."}
+            </p>
           </div>
         </div>
       </div>
@@ -342,10 +321,10 @@ export default function Settings() {
         </form>
       </div>
 
-      {/* Team Members Section */}
+      {/* Admins Section */}
       <div className="space-y-6">
-        {/* Add New User Form */}
-        {showNewUserForm && (
+        {/* Add New Admin Form */}
+        {showNewAdminForm && (
           <div className="bg-white rounded-2xl p-8 shadow-lg border border-gray-100">
             <div className="flex items-center justify-between mb-8">
               <div className="flex items-center space-x-3">
@@ -355,18 +334,18 @@ export default function Settings() {
                   </svg>
                 </div>
                 <div>
-                  <h2 className="text-xl font-semibold text-gray-900 font-poppins">Add New Team Member</h2>
-                  <p className="text-gray-600 font-poppins">Create a new team member account</p>
+                  <h2 className="text-xl font-semibold text-gray-900 font-poppins">Add New Admin</h2>
+                  <p className="text-gray-600 font-poppins">Create a new admin account</p>
                 </div>
               </div>
               <button
-                onClick={() => setShowNewUserForm(false)}
+                onClick={() => setShowNewAdminForm(false)}
                 className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-500 hover:text-gray-700 transition-colors"
               >
                 ✕
               </button>
             </div>
-            <form onSubmit={handleNewUserSubmit} className="space-y-6">
+            <form onSubmit={handleNewAdminSubmit} className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* Email */}
                 <div className="space-y-2">
@@ -377,32 +356,16 @@ export default function Settings() {
                     type="email"
                     id="email"
                     name="email"
-                    value={newUserData.email}
-                    onChange={handleNewUserChange}
+                    value={newAdminData.email}
+                    onChange={handleNewAdminChange}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white text-black font-poppins"
                     placeholder="Enter email address"
                     required
                   />
                 </div>
 
-                {/* Role */}
-                <div className="space-y-2">
-                  <label htmlFor="role" className="block text-sm font-medium text-gray-700 font-poppins">
-                    Role
-                  </label>
-                  <select
-                    id="role"
-                    name="role"
-                    value={newUserData.role}
-                    onChange={handleNewUserChange}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white text-black font-poppins"
-                    required
-                  >
-                    <option value="Administrator">Administrator</option>
-                    <option value="Moderator">Moderator</option>
-                    <option value="Viewer">Viewer</option>
-                  </select>
-                </div>
+                {/* Empty div for grid layout */}
+                <div></div>
 
                 {/* Password */}
                 <div className="space-y-2">
@@ -411,21 +374,21 @@ export default function Settings() {
                   </label>
                   <div className="relative">
                     <input
-                      type={showNewUserPassword ? "text" : "password"}
+                      type={showNewAdminPassword ? "text" : "password"}
                       id="password"
                       name="password"
-                      value={newUserData.password}
-                      onChange={handleNewUserChange}
+                      value={newAdminData.password}
+                      onChange={handleNewAdminChange}
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white text-black font-poppins pr-10"
                       placeholder="Enter password"
                       required
                     />
                     <button
                       type="button"
-                      onClick={() => setShowNewUserPassword(!showNewUserPassword)}
+                      onClick={() => setShowNewAdminPassword(!showNewAdminPassword)}
                       className="absolute right-3 top-2.5 text-gray-400 hover:text-gray-600"
                     >
-                      <FontAwesomeIcon icon={showNewUserPassword ? faEyeSlash : faEye} className="w-4 h-4" />
+                      <FontAwesomeIcon icon={showNewAdminPassword ? faEyeSlash : faEye} className="w-4 h-4" />
                     </button>
                   </div>
                 </div>
@@ -437,21 +400,21 @@ export default function Settings() {
                   </label>
                   <div className="relative">
                     <input
-                      type={showNewUserConfirmPassword ? "text" : "password"}
+                      type={showNewAdminConfirmPassword ? "text" : "password"}
                       id="confirmPassword"
                       name="confirmPassword"
-                      value={newUserData.confirmPassword}
-                      onChange={handleNewUserChange}
+                      value={newAdminData.confirmPassword}
+                      onChange={handleNewAdminChange}
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white text-black font-poppins pr-10"
                       placeholder="Confirm password"
                       required
                     />
                     <button
                       type="button"
-                      onClick={() => setShowNewUserConfirmPassword(!showNewUserConfirmPassword)}
+                      onClick={() => setShowNewAdminConfirmPassword(!showNewAdminConfirmPassword)}
                       className="absolute right-3 top-2.5 text-gray-400 hover:text-gray-600"
                     >
-                      <FontAwesomeIcon icon={showNewUserConfirmPassword ? faEyeSlash : faEye} className="w-4 h-4" />
+                      <FontAwesomeIcon icon={showNewAdminConfirmPassword ? faEyeSlash : faEye} className="w-4 h-4" />
                     </button>
                   </div>
                 </div>
@@ -461,24 +424,24 @@ export default function Settings() {
               <div className="flex justify-end space-x-4">
                 <button
                   type="button"
-                  onClick={() => setShowNewUserForm(false)}
+                  onClick={() => setShowNewAdminForm(false)}
                   className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 font-poppins hover:bg-gray-50 transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  disabled={newUserLoading}
+                  disabled={newAdminLoading}
                   className="px-6 py-2 bg-purple-600 text-white rounded-lg font-poppins hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {newUserLoading ? "Adding..." : "Add Team Member"}
+                  {newAdminLoading ? "Adding..." : "Add Admin"}
                 </button>
               </div>
             </form>
           </div>
         )}
 
-                {/* Team Members Table */}
+        {/* Admins Table */}
         <div className="bg-white rounded-2xl p-8 shadow-lg border border-gray-100">
           <div className="flex items-center justify-between mb-8">
             <div className="flex items-center space-x-3">
@@ -488,21 +451,21 @@ export default function Settings() {
                 </svg>
               </div>
               <div>
-                <h2 className="text-xl font-semibold text-gray-900 font-poppins">Team Members</h2>
-                <p className="text-gray-600 font-poppins">Manage your team access and permissions</p>
+                <h2 className="text-xl font-semibold text-gray-900 font-poppins">Admins</h2>
+                <p className="text-gray-600 font-poppins">Manage admin accounts and access</p>
               </div>
             </div>
             <button
-              onClick={() => setShowNewUserForm(true)}
+              onClick={() => setShowNewAdminForm(true)}
               className="px-6 py-3 bg-purple-600 text-white rounded-xl font-semibold font-poppins hover:bg-purple-700 transition-all duration-200 flex items-center space-x-2 shadow-lg hover:shadow-xl"
             >
               <FontAwesomeIcon icon={faPlus} className="w-4 h-4" />
-              <span>Add Team Member</span>
+              <span>Add Admin</span>
             </button>
           </div>
           <DataTable
-            columns={teamMemberColumns}
-            data={teamMembers as unknown as Record<string, unknown>[]}
+            columns={adminColumns}
+            data={admins as unknown as Record<string, unknown>[]}
           />
         </div>
       </div>
