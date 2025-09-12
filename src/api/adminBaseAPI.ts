@@ -13,13 +13,55 @@ export const adminApiRequest = async <T = unknown>(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<T> => {
-  const token = useAdminAuthStore.getState().token;
+  const adminAuth = useAdminAuthStore.getState();
+  const token = adminAuth.token;
+  let adminEmail: string | undefined;
+
+  // Get admin email for auto-login fallback
+  if (adminAuth.admin?.email) {
+    adminEmail = adminAuth.admin.email;
+  } else {
+    try {
+      const storedAdmin = localStorage.getItem('juicy-meets-admin-auth-storage');
+      if (storedAdmin) {
+        const adminData = JSON.parse(storedAdmin);
+        adminEmail = adminData?.state?.admin?.email;
+      }
+    } catch {
+      console.warn('Could not access localStorage for admin email');
+    }
+  }
+
+  console.log('🔍 Admin API Request Debug:', { endpoint, hasToken: !!token, hasEmail: !!adminEmail });
 
   // Check if the body is FormData
   const isFormData = options.body instanceof FormData;
 
+  // Prepare request body with email for auto-login
+  let requestBody = options.body;
+  if (adminEmail && !isFormData) {
+    if (options.method === 'POST' && requestBody) {
+      try {
+        const bodyData = typeof requestBody === 'string' ? JSON.parse(requestBody) : requestBody;
+        bodyData.email = adminEmail;
+        requestBody = JSON.stringify(bodyData);
+      } catch (error) {
+        console.warn('Could not add email to admin request body:', error);
+      }
+    } else if (options.method === 'POST' && !requestBody) {
+      // If no body exists, create one with just the email
+      requestBody = JSON.stringify({ email: adminEmail });
+    } else if (['GET', 'PUT', 'PATCH', 'DELETE'].includes(options.method || 'GET')) {
+      // For non-POST requests, add email as query parameter
+      const modifiedEndpoint = `${endpoint}${endpoint.includes('?') ? '&' : '?'}email=${encodeURIComponent(adminEmail)}`;
+      // Update the endpoint for the final request
+      endpoint = modifiedEndpoint;
+    }
+  }
+  console.log('🔍 Request body:', requestBody);
   const config: RequestInit = {
     ...options,
+    body: requestBody,
     headers: {
       // Don't set Content-Type for FormData, let the browser set it with boundary
       ...(isFormData ? {} : { "Content-Type": "application/json" }),

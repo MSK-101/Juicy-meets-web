@@ -5,28 +5,14 @@ import {
   ApiResponse,
   PaginatedResponse,
 } from "./admin-types";
-
-// Get API base URL from environment variable
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '/api/v1';
+import { adminApi } from "../api/adminBaseAPI";
 
 // API Functions
-export const adminApi = {
+export const adminApiFunctions = {
   // Dashboard
-  getDashboardData: async (token?: string): Promise<ApiResponse<DashboardData>> => {
+  getDashboardData: async (): Promise<ApiResponse<DashboardData>> => {
     try {
-      const response = await fetch(`${API_BASE_URL}/admin/dashboard`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
+      const data = await adminApi.get<ApiResponse<DashboardData>>('/admin/dashboard');
       return data;
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
@@ -39,8 +25,7 @@ export const adminApi = {
     page: number = 1,
     limit: number = 10,
     status?: string,
-    search?: string,
-    token?: string
+    search?: string
   ): Promise<ApiResponse<PaginatedResponse<User>>> => {
     try {
       const params = new URLSearchParams({
@@ -56,19 +41,7 @@ export const adminApi = {
         params.append('search', search);
       }
 
-      const response = await fetch(`${API_BASE_URL}/admin/users?${params}`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
+      const data = await adminApi.get<ApiResponse<PaginatedResponse<User>>>(`/admin/users?${params}`);
       return data;
     } catch (error) {
       console.error('Error fetching users:', error);
@@ -76,21 +49,9 @@ export const adminApi = {
     }
   },
 
-  getUserStats: async (token?: string): Promise<ApiResponse<{ registered: number; inactive: number; newUsers: number }>> => {
+  getUserStats: async (): Promise<ApiResponse<{ registered: number; inactive: number; newUsers: number }>> => {
     try {
-      const response = await fetch(`${API_BASE_URL}/admin/users/stats`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
+      const data = await adminApi.get<ApiResponse<{ registered: number; inactive: number; newUsers: number }>>('/admin/users/stats');
       return data;
     } catch (error) {
       console.error('Error fetching user stats:', error);
@@ -104,8 +65,7 @@ export const adminApi = {
     limit: number = 10,
     pool?: string,
     sequence?: string,
-    search?: string,
-    token?: string
+    search?: string
   ): Promise<ApiResponse<PaginatedResponse<Video>>> => {
     try {
       const params = new URLSearchParams({
@@ -125,19 +85,7 @@ export const adminApi = {
         params.append('search', search);
       }
 
-      const response = await fetch(`${API_BASE_URL}/admin/videos?${params}`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
+      const data = await adminApi.get<ApiResponse<PaginatedResponse<Video>>>(`/admin/videos?${params}`);
       return data;
     } catch (error) {
       console.error('Error fetching videos:', error);
@@ -145,21 +93,9 @@ export const adminApi = {
     }
   },
 
-  getVideoFilters: async (token?: string): Promise<ApiResponse<{ pools: string[]; sequences: string[] }>> => {
+  getVideoFilters: async (): Promise<ApiResponse<{ pools: string[]; sequences: string[] }>> => {
     try {
-      const response = await fetch(`${API_BASE_URL}/admin/videos/filters`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
+      const data = await adminApi.get<ApiResponse<{ pools: string[]; sequences: string[] }>>('/admin/videos/filters');
       return data;
     } catch (error) {
       console.error('Error fetching video filters:', error);
@@ -169,15 +105,15 @@ export const adminApi = {
 
   // Authentication
   login: async (email: string, password: string): Promise<ApiResponse<{ token: string }>> => {
-    await new Promise(resolve => setTimeout(resolve, 1000));
-
-    if (email === "admin@juicymeets.com" && password === "admin123") {
-      return {
-        success: true,
-        data: { token: "mock-admin-token" },
-      };
-    } else {
-      throw new Error("Invalid credentials");
+    try {
+      const data = await adminApi.post<ApiResponse<{ token: string }>>('/admin/auth/login', {
+        email,
+        password
+      });
+      return data;
+    } catch (error) {
+      console.error('Error during admin login:', error);
+      throw error;
     }
   },
 };

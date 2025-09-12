@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { adminApi } from "@/lib/admin-api";
+import { adminApiFunctions as adminApi } from "@/lib/admin-api";
 import { User } from "@/lib/admin-types";
 import DataTable from "@/components/admin/DataTable";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
@@ -23,8 +23,8 @@ export default function Users() {
     const fetchData = async () => {
       try {
         const [usersResponse, statsResponse] = await Promise.all([
-          adminApi.getUsers(currentPage, 10, statusFilter === "all" ? undefined : statusFilter, searchQuery || undefined, adminToken || undefined),
-          adminApi.getUserStats(adminToken || undefined),
+          adminApi.getUsers(currentPage, 10, statusFilter === "all" ? undefined : statusFilter, searchQuery || undefined),
+          adminApi.getUserStats(),
         ]);
 
         setUsers(usersResponse.data.data);

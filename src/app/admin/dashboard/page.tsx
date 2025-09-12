@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { adminApi } from "@/lib/admin-api";
+import { adminApiFunctions as adminApi } from "@/lib/admin-api";
 import { DashboardData } from "@/lib/admin-types";
 import StatCard from "@/components/admin/StatCard";
 import DataTable from "@/components/admin/DataTable";
@@ -18,7 +18,7 @@ export default function Dashboard() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const response = await adminApi.getDashboardData(adminToken || undefined);
+        const response = await adminApi.getDashboardData();
         setData(response.data);
       } catch (error) {
         console.error("Failed to fetch dashboard data:", error);
