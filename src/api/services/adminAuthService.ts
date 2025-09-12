@@ -1,4 +1,4 @@
-import { api } from "../baseAPI";
+import { adminApi } from "../adminBaseAPI";
 
 // Type definitions for admin requests/responses
 export interface Admin {
@@ -36,7 +36,7 @@ export const adminAuthService = {
   // Admin Authentication
   login: async (credentials: AdminLoginRequest): Promise<AdminAuthData> => {
     try {
-      const response = await api.post("/admin/auth/login", credentials) as AdminLoginResponse;
+      const response = await adminApi.post("/admin/auth/login", credentials) as AdminLoginResponse;
       console.log("Admin login response:", response);
 
       // Check if response has the expected structure
@@ -57,7 +57,7 @@ export const adminAuthService = {
 
   logout: async (): Promise<void> => {
     try {
-      await api.delete("/admin/auth/logout");
+      await adminApi.delete("/admin/auth/logout");
     } catch (error) {
       console.error("Admin logout error:", error);
       throw error;
@@ -66,7 +66,7 @@ export const adminAuthService = {
 
   getCurrentAdmin: async (): Promise<Admin> => {
     try {
-      const response = await api.get("/admin/auth/me") as {
+      const response = await adminApi.get("/admin/auth/me") as {
         success: boolean;
         data: { admin: Admin };
       };
