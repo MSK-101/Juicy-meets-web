@@ -1,9 +1,9 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import DataTable from "@/components/admin/DataTable";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faEdit, faPlus, faEye, faEyeSlash } from "@fortawesome/free-solid-svg-icons";
+import { faTrash, faPlus, faEye, faEyeSlash } from "@fortawesome/free-solid-svg-icons";
 import { useAdminAuthStore } from "@/store/adminAuth";
 import { adminAuthService } from "@/api/services/adminAuthService";
 
@@ -30,7 +30,7 @@ interface NewAdminFormData {
 
 export default function Settings() {
   // Get current admin from store
-  const { admin: currentAdmin, token } = useAdminAuthStore();
+  const { admin: currentAdmin } = useAdminAuthStore();
 
   // Password change state
   const [passwordData, setPasswordData] = useState<PasswordFormData>({
@@ -56,15 +56,8 @@ export default function Settings() {
 
   // Admins state
   const [admins, setAdmins] = useState<Admin[]>([]);
-  const [adminsLoading, setAdminsLoading] = useState(false);
 
-  // Load admins on component mount
-  useEffect(() => {
-    loadAdmins();
-  }, []);
-
-  const loadAdmins = async () => {
-    setAdminsLoading(true);
+  const loadAdmins = useCallback(async () => {
     try {
       const adminsData = await adminAuthService.getAdmins();
       setAdmins(adminsData);
@@ -74,10 +67,13 @@ export default function Settings() {
       if (currentAdmin) {
         setAdmins([currentAdmin]);
       }
-    } finally {
-      setAdminsLoading(false);
     }
-  };
+  }, [currentAdmin]);
+
+  // Load admins on component mount
+  useEffect(() => {
+    loadAdmins();
+  }, [loadAdmins]);
 
   const handlePasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -155,6 +151,28 @@ export default function Settings() {
     }
   };
 
+  const handleDeleteAdmin = async (adminId: number, adminEmail: string) => {
+    // Prevent deleting current admin
+    if (currentAdmin && adminId === currentAdmin.id) {
+      alert("You cannot delete your own account!");
+      return;
+    }
+
+    // Confirm deletion
+    if (!confirm(`Are you sure you want to delete admin "${adminEmail}"? This action cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      await adminAuthService.deleteAdmin(adminId);
+      setAdmins(prev => prev.filter(admin => admin.id !== adminId));
+      alert("Admin deleted successfully!");
+    } catch (error) {
+      console.error("Error deleting admin:", error);
+      alert("Failed to delete admin. Please try again.");
+    }
+  };
+
   const adminColumns = [
     { key: "display_name", label: "Name" },
     { key: "email", label: "Email" },
@@ -170,14 +188,22 @@ export default function Settings() {
     {
       key: "action",
       label: "Actions",
-      render: (_value: unknown, row: Record<string, unknown>) => (
-        <button
-          onClick={() => console.log("Edit admin:", row.id)}
-          className="text-purple-600 hover:text-purple-700 transition-colors"
-        >
-          <FontAwesomeIcon icon={faEdit} className="w-4 h-4" />
-        </button>
-      )
+      render: (_value: unknown, row: Record<string, unknown>) => {
+        // Don't show delete button for current admin
+        if (currentAdmin && row.id === currentAdmin.id) {
+          return <span className="text-gray-400 text-sm">Current User</span>;
+        }
+
+        return (
+          <button
+            onClick={() => handleDeleteAdmin(row.id as number, row.email as string)}
+            className="text-red-600 hover:text-red-700 transition-colors"
+            title="Delete admin"
+          >
+            <FontAwesomeIcon icon={faTrash} className="w-4 h-4" />
+          </button>
+        );
+      }
     },
   ];
 

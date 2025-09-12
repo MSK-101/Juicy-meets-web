@@ -143,4 +143,20 @@ export const adminAuthService = {
       throw error;
     }
   },
+
+  deleteAdmin: async (adminId: number): Promise<void> => {
+    try {
+      const response = await adminApi.delete(`/admin/admins/${adminId}`) as {
+        success: boolean;
+        message?: string;
+      };
+
+      if (!response?.success) {
+        throw new Error(response?.message || "Failed to delete admin");
+      }
+    } catch (error) {
+      console.error("Delete admin error:", error);
+      throw error;
+    }
+  },
 };
