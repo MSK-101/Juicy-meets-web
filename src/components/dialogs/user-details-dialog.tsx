@@ -145,19 +145,13 @@ export default function UserDetailsDialog({
   };
 
   const handleDialogClose = (open: boolean) => {
-    // Only allow closing if the form is complete or if we're opening the dialog
     if (open) {
       setShowDialog(true);
-    } else if (isFormValid || showLoginOption) {
-      // Allow closing if form is valid or if showing login option
-      setShowDialog(false);
-      // Reset dialog state
-      resetDialogState();
     } else {
-      // Prevent closing if form is incomplete
-      console.log('⚠️ Cannot close dialog - form incomplete');
-      // Optionally show a message to the user
-      setError('Please complete all required fields before closing.');
+      // Always allow closing the dialog (including via cross icon)
+      setShowDialog(false);
+      // Reset dialog state when closing
+      resetDialogState();
     }
   };
 
