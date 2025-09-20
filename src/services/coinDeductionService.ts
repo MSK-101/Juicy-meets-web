@@ -26,6 +26,9 @@ class CoinDeductionService {
   private appliedThresholds: Set<number> = new Set();
   private chatStartTime: number | null = null;
   private durationCheckInterval: NodeJS.Timeout | null = null;
+  private currentBalance: number = 0;
+  private isBalanceZero: boolean = false;
+  private lastBalanceCheck: number = 0;
 
   // Initialize deduction rules
   async initializeDeductionRules(): Promise<void> {
@@ -40,16 +43,23 @@ class CoinDeductionService {
   }
 
   // Start tracking chat duration
-  startChatDurationTracking(): void {
+  async startChatDurationTracking(): Promise<void> {
     this.chatStartTime = Date.now();
     this.appliedThresholds.clear();
 
-    // Check for deductions every second
-    this.durationCheckInterval = setInterval(() => {
-      this.checkAndApplyDeductions();
-    }, 1000);
+    // Get initial balance to avoid redundant checks
+    await this.updateCurrentBalance();
 
-    console.log('⏱️ Started chat duration tracking');
+    // Only start interval checking if user has coins
+    if (!this.isBalanceZero) {
+      // Check for deductions every second
+      this.durationCheckInterval = setInterval(() => {
+        this.checkAndApplyDeductions();
+      }, 1000);
+      console.log('⏱️ Started chat duration tracking (user has coins)');
+    } else {
+      console.log('💰 User has no coins - skipping duration tracking entirely');
+    }
   }
 
   // Stop tracking chat duration
@@ -60,21 +70,15 @@ class CoinDeductionService {
     }
     this.chatStartTime = null;
     this.appliedThresholds.clear();
+    this.isBalanceZero = false; // Reset for next session
     console.log('⏱️ Stopped chat duration tracking');
   }
 
-  // Check and apply deductions based on current duration
+  // Check and apply deductions based on current duration - OPTIMIZED
   private async checkAndApplyDeductions(): Promise<void> {
-    if (!this.chatStartTime) return;
+    if (!this.chatStartTime || this.isBalanceZero) return;
 
     const currentDuration = Math.floor((Date.now() - this.chatStartTime) / 1000);
-
-    // Check if user has coins before attempting deduction
-    const currentBalance = await this.getUserBalance();
-    if (currentBalance <= 0) {
-      console.log('💰 User has no coins, skipping duration-based deductions');
-      return;
-    }
 
     // Check each rule to see if we've reached the threshold
     for (const rule of this.activeRules) {
@@ -87,6 +91,14 @@ class CoinDeductionService {
           if (result.success) {
             this.appliedThresholds.add(rule.threshold_seconds);
             console.log(`✅ Applied deduction: ${result.deducted} coins, new balance: ${result.new_balance}`);
+
+            // Update cached balance
+            this.currentBalance = result.new_balance;
+            if (result.new_balance <= 0) {
+              this.isBalanceZero = true;
+              console.log('💰 Balance reached zero - stopping future deduction checks');
+              this.stopDurationTracking();
+            }
 
             // Emit event for UI updates
             this.emitDeductionApplied(result);
@@ -136,6 +148,33 @@ class CoinDeductionService {
     }
   }
 
+  // Update cached balance efficiently
+  private async updateCurrentBalance(): Promise<void> {
+    try {
+      this.currentBalance = await this.getUserBalance();
+      this.isBalanceZero = this.currentBalance <= 0;
+      this.lastBalanceCheck = Date.now();
+
+      if (this.isBalanceZero) {
+        console.log('💰 User balance is zero - no deductions needed');
+      } else {
+        console.log(`💰 Current balance: ${this.currentBalance} coins`);
+      }
+    } catch (error) {
+      console.error('❌ Failed to update balance cache:', error);
+      this.isBalanceZero = true; // Fail-safe: assume no balance
+    }
+  }
+
+  // Stop duration tracking interval
+  private stopDurationTracking(): void {
+    if (this.durationCheckInterval) {
+      clearInterval(this.durationCheckInterval);
+      this.durationCheckInterval = null;
+      console.log('⏹️ Stopped duration tracking (balance exhausted)');
+    }
+  }
+
   // Emit deduction applied event
   private emitDeductionApplied(result: DeductionResult): void {
     const event = new CustomEvent('coinDeductionApplied', {
@@ -166,6 +205,22 @@ class CoinDeductionService {
   // Check if a threshold has been applied
   isThresholdApplied(threshold: number): boolean {
     return this.appliedThresholds.has(threshold);
+  }
+
+  // Get cached balance (avoids API call)
+  getCachedBalance(): number {
+    return this.currentBalance;
+  }
+
+  // Check if user has no coins (cached)
+  hasNoCoins(): boolean {
+    return this.isBalanceZero;
+  }
+
+  // Force refresh balance cache
+  async refreshBalance(): Promise<number> {
+    await this.updateCurrentBalance();
+    return this.currentBalance;
   }
 }
 
