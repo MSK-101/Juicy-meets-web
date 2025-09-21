@@ -68,39 +68,29 @@ export default function VideoChatPage() {
 
     // CRITICAL FIX: Set up remote stream callback immediately to prevent timing issues
     // This ensures the callback is available even if streams arrive before full initialization
-    console.log('🚀 Setting up early remote stream callback to prevent timing issues');
     cleanVideoChatService.onRemoteStream((stream) => {
-      console.log('📺 Early remote stream callback triggered');
-      console.log('🔍 Early stream details:', {
-        streamId: stream.id,
-        active: stream.active,
-        trackCount: stream.getTracks().length,
-        tracks: stream.getTracks().map(t => t.kind)
-      });
+      console.log('📺 UI: Remote stream callback received:', !!stream);
 
-      // Don't handle remote streams if we're playing a video
-      // Note: Use React state callback to get latest value
-      setRemoteStream(currentRemoteStream => {
-        setIsVideoPlaying(currentIsVideoPlaying => {
-          if (currentIsVideoPlaying) {
-            console.log('🎥 Early callback: Ignoring remote stream - currently playing video');
-            return currentIsVideoPlaying; // Return unchanged
-          }
+      // Check if we're playing a video first
+      if (isVideoPlaying) {
+        console.log('📺 UI: Ignoring remote stream - video is playing');
+        return;
+      }
 
-          console.log('🔗 Early callback: Remote stream received for live connection');
-          setConnectionState('connected');
-          console.log('✅ Early callback: Remote stream state updated in UI');
+      // Set the remote stream directly
+      console.log('📺 UI: Setting remote stream');
+      setRemoteStream(stream);
 
-          // Start tracking chat duration for coin deductions
-          coinDeductionService.startChatDurationTracking();
-
-          return currentIsVideoPlaying; // Return unchanged
-        });
-
-        return stream; // Return the new stream
-      });
+      // Update connection state if we got a stream
+      if (stream) {
+        setConnectionState('connected');
+        coinDeductionService.startChatDurationTracking();
+        console.log('📺 UI: Connection state set to connected');
+      }
     });
   }, []);
+
+  // Removed streamKey logic - component remounting was causing issues
 
     // Touch gesture handlers for mobile swipe
   const handleTouchStart = (e: React.TouchEvent) => {
@@ -138,6 +128,12 @@ export default function VideoChatPage() {
   // Centralized swipe handler for both touch and button
   const handleSwipeToNext = async () => {
     try {
+      // CRITICAL: Clear ALL UI state before swipe
+      console.log('🔄 SWIPE: Clearing UI state...');
+      setRemoteStream(null);
+      setConnectionState('connecting');
+      setMessages([]);
+
       const result = await nextSwipe(
         setConnectionState,
         setError,
@@ -155,13 +151,11 @@ export default function VideoChatPage() {
           // Update coin balance
           setCoinBalance(deduction.new_balance);
           userService.updateUserCoinBalance(deduction.new_balance);
-          console.log(`💰 Per-swipe deduction applied: ${deduction.deducted} coins, new balance: ${deduction.new_balance}`);
         } else if (!deduction.success) {
-          console.warn(`⚠️ Per-swipe deduction failed: ${deduction.error}`);
         }
       }
     } catch (error) {
-      console.error('❌ Error during swipe:', error);
+
     }
   };
 
@@ -217,13 +211,11 @@ export default function VideoChatPage() {
 
       // Show notification for deduction
       if (result.deducted > 0) {
-        console.log(`💰 Coin deduction applied: ${result.deducted} coins, new balance: ${result.new_balance}`);
       }
     };
 
     const handleCoinDeductionError = (event: CustomEvent) => {
       const result = event.detail;
-      console.warn(`⚠️ Coin deduction failed: ${result.error}`);
     };
 
     window.addEventListener('coinDeductionApplied', handleCoinDeduction as EventListener);
@@ -258,36 +250,20 @@ export default function VideoChatPage() {
       setUserId(currentUserId);
 
             // Note: Remote stream callback already set up in early useEffect to prevent timing issues
-      console.log('🔍 Remote stream callback already configured early to prevent timing issues');
 
       // Set up video match event listener
       cleanVideoChatService.onVideoMatch((videoData) => {
-        console.log('🎥 Video match event triggered:', videoData);
-        console.log('🎥 Current state before update:', {
-          isVideoPlaying,
-          currentVideoId,
-          currentVideoUrl,
-          currentVideoName
-        });
 
         setConnectionState('connected');
         setError(null);
 
         // Clear remote stream to prevent conflicts with video playback
-        console.log('🧹 Clearing remote stream for video playback');
         setRemoteStream(null);
 
         setIsVideoPlaying(true);
         setCurrentVideoId(videoData.videoId);
         setCurrentVideoUrl(videoData.videoUrl);
         setCurrentVideoName(videoData.videoName);
-
-        console.log('🎥 State after update:', {
-          isVideoPlaying: true,
-          currentVideoId: videoData.videoId,
-          currentVideoUrl: videoData.videoUrl,
-          currentVideoName: videoData.videoName
-        });
 
         // Start new tracking for video
         coinDeductionService.startChatDurationTracking();
@@ -316,22 +292,19 @@ export default function VideoChatPage() {
       }
 
       cleanVideoChatService.onConnectionStateChange((state) => {
-        console.log('🔗 Connection state changed:', state);
 
         if (state === 'connected') {
           setConnectionState('connected');
 
           // For live connections (not video), ensure local stream is available
           if (!isVideoPlaying && !localStream) {
-            console.log('🔍 Live connection established but local stream missing, restoring...');
             try {
               const currentLocalStream = cleanVideoChatService.getCurrentLocalStream();
               if (currentLocalStream) {
                 setLocalStream(currentLocalStream);
-                console.log('✅ Local stream restored for live connection');
               }
             } catch (error) {
-              console.error('❌ Error restoring local stream:', error);
+
             }
           }
         } else if (state === 'failed' || state === 'disconnected') {
@@ -340,7 +313,6 @@ export default function VideoChatPage() {
       });
 
       cleanVideoChatService.onPartnerLeft(() => {
-        console.log('👋 Partner left - clearing remote stream');
         setRemoteStream(null);
         setConnectionState('disconnected');
         setIsVideoPlaying(false);
@@ -575,9 +547,9 @@ export default function VideoChatPage() {
       // For real user matches, send via PubNub
       try {
         await cleanVideoChatService.sendMessage(input.trim());
-        console.log('✅ Message sent via PubNub');
+
       } catch (error) {
-        console.error('❌ Failed to send message:', error);
+
         // You might want to show an error to the user here
       }
     }
@@ -627,16 +599,8 @@ export default function VideoChatPage() {
           <div className="h-[60%] md:flex-1 flex flex-col relative overflow-hidden md:h-full">
             <div className="w-full h-full">
               {(() => {
-                console.log('🔍 Conditional rendering check:', {
-                  isVideoPlaying,
-                  currentVideoId,
-                  currentVideoUrl,
-                  currentVideoName,
-                  remoteStream: !!remoteStream
-                });
 
                 if (isVideoPlaying && currentVideoId) {
-                  console.log('🎥 Rendering VideoPlayer component');
                   return (
                     <VideoPlayer
                       videoId={currentVideoId}
@@ -646,7 +610,6 @@ export default function VideoChatPage() {
                     />
                   );
                 } else {
-                  console.log('🔗 Rendering SplitVideoChat component (remote)');
                   return (
                     <SplitVideoChat
                       chatId={chatId}

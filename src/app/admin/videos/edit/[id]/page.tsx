@@ -153,7 +153,7 @@ export default function EditVideoPage({ params }: EditVideoPageProps) {
       await updateVideoMutation.mutateAsync({ id: videoId, data: videoData });
       router.push("/admin/videos");
                  } catch (error: unknown) {
-      console.error("Error updating video:", error);
+      
       // Handle specific error messages from the API
       if (error && typeof error === 'object' && 'response' in error &&
           error.response && typeof error.response === 'object' && 'data' in error.response &&

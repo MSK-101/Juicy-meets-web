@@ -32,7 +32,7 @@ export default function Users() {
         setTotalUsers(usersResponse.data.total);
         setStats(statsResponse.data);
       } catch (error) {
-        console.error("Failed to fetch users data:", error);
+        
       } finally {
         setLoading(false);
       }

@@ -126,7 +126,7 @@ export default function AddVideo() {
       await createVideoMutation.mutateAsync(videoData);
       router.push("/admin/videos");
                  } catch (error: unknown) {
-      console.error("Error creating video:", error);
+      
       // Handle specific error messages from the API
       if (error && typeof error === 'object' && 'response' in error) {
         const response = (error as { response?: { data?: { errors?: Record<string, unknown> } } }).response;

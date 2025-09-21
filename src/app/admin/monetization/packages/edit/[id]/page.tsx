@@ -35,7 +35,7 @@ export default function EditPackage() {
           sort_order: packageData.sort_order,
         });
       } catch (error) {
-        console.error("Failed to fetch package:", error);
+        
         setErrors({ general: "Failed to load package data." });
       } finally {
         setInitialLoading(false);
@@ -97,7 +97,7 @@ export default function EditPackage() {
       await monetizationService.updateCoinPackage(packageId, formData);
       router.push("/admin/monetization");
     } catch (error) {
-      console.error("Failed to update package:", error);
+      
       setErrors({ general: "Failed to update package. Please try again." });
     } finally {
       setLoading(false);

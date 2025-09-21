@@ -14,14 +14,12 @@ export const MockVideoChat: React.FC = () => {
   useEffect(() => {
     // Set up event listeners
     mockVideoChatService.onRemoteStream((stream) => {
-      console.log('🎥 Remote stream received in component');
       if (remoteVideoRef.current) {
         remoteVideoRef.current.srcObject = stream;
       }
     });
 
     mockVideoChatService.onConnectionStateChange((state) => {
-      console.log('🔗 Connection state changed:', state);
       setConnectionState(state);
 
       if (state === 'connected') {
@@ -30,7 +28,6 @@ export const MockVideoChat: React.FC = () => {
     });
 
     mockVideoChatService.onPartnerLeft(() => {
-      console.log('👋 Partner left');
       setStatus('idle');
       setError('Partner left the chat');
     });
@@ -56,7 +53,7 @@ export const MockVideoChat: React.FC = () => {
       await mockVideoChatService.joinQueue();
       setStatus('waiting');
     } catch (err) {
-      console.error('❌ Failed to start video chat:', err);
+      
       setError(err instanceof Error ? err.message : 'Failed to start video chat');
       setStatus('error');
     }
@@ -76,7 +73,7 @@ export const MockVideoChat: React.FC = () => {
         remoteVideoRef.current.srcObject = null;
       }
     } catch (err) {
-      console.error('❌ Failed to stop video chat:', err);
+      
     }
   };
 

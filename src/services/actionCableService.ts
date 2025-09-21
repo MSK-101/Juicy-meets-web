@@ -39,31 +39,25 @@
 //     try {
 //       this.consumer = createConsumer(process.env.NEXT_PUBLIC_ACTION_CABLE_URL || 'ws://localhost:3000/cable');
 //     } catch (error) {
-//       console.error('Failed to initialize ActionCable:', error);
+//       
 //     }
 //   }
 
 //   async connect(userId: string, chatId: string, authToken: string): Promise<boolean> {
 //     if (!this.isClient) {
-//       console.log('ActionCable not available on server side');
 //       return false;
 //     }
 
 //     if (this.isConnecting) {
-//       console.log('ActionCable: Already connecting...');
 //       return false;
 //     }
 
 //     if (!this.consumer) {
-//       console.log('ActionCable: Consumer not initialized');
 //       return false;
 //     }
 
 //     try {
 //       this.isConnecting = true;
-//       console.log('🔌 ActionCable: Connecting user:', userId, 'to chat:', chatId);
-//       console.log('🔌 ActionCable: Consumer URL:', process.env.NEXT_PUBLIC_ACTION_CABLE_URL);
-//       console.log('🔌 ActionCable: Consumer instance:', !!this.consumer);
 
 //       this.currentUser = userId;
 //       this.currentChatId = chatId;
@@ -78,41 +72,28 @@
 //         },
 //         {
 //           connected: () => {
-//             console.log('✅ ActionCable: Connected to chat room:', chatId);
 //             this.isConnecting = false;
 //           },
 //           disconnected: () => {
-//             console.log('❌ ActionCable: Disconnected from chat room:', chatId);
 //             this.isConnecting = false;
 //           },
 //           rejected: () => {
-//             console.log('❌ ActionCable: Connection rejected for chat room:', chatId);
-//             console.log('❌ ActionCable: Rejection details - check backend logs');
 //             this.isConnecting = false;
 //           },
 //           received: (data: any) => {
-//             console.log('📨 ActionCable: Raw message received:', data);
-//             console.log('📨 ActionCable: Message structure:', {
-//               type: data.type,
-//               from: data.from,
-//               chatId: data.chat_id || data.chatId,
-//               hasData: !!data.data,
-//               dataType: data.data ? typeof data.data : 'undefined',
-//               fullData: data
-//             });
+//             
 //             // Handle received messages here
 //             this.handleReceivedMessage(data);
 //           },
 //         }
 //       );
 
-//       console.log('🔌 ActionCable: Subscription created');
 //       this.subscriptions.set(chatId, subscription);
 
 //       // Return true - ActionCable will handle connection state internally
 //       return true;
 //     } catch (error) {
-//       console.error('💥 ActionCable connection error:', error);
+//       
 //       this.isConnecting = false;
 //       return false;
 //     }
@@ -134,13 +115,11 @@
 //   // Send WebRTC signaling message
 //   sendSignalingMessage(message: Omit<WebRTCSignalingMessage, 'from' | 'timestamp'>): boolean {
 //     if (!this.isClient) {
-//       console.log('ActionCable not available on server side');
 //       return false;
 //     }
 
 //     const subscription = this.subscriptions.get(message.chatId);
 //     if (!subscription) {
-//       console.log('Not subscribed to chat room:', message.chatId);
 //       return false;
 //     }
 
@@ -155,11 +134,10 @@
 //       if (subscription.perform) {
 //         subscription.perform('send_message', fullMessage);
 //       } else {
-//         console.log('ActionCable subscription does not support perform method');
 //       }
 //       return true;
 //     } catch (error) {
-//       console.error('Error sending signaling message:', error);
+//       
 //       return false;
 //     }
 //   }
@@ -223,8 +201,6 @@
 //       timestamp: message.timestamp || Date.now()
 //     };
 
-//     console.log('📨 ActionCable: Normalized message:', normalizedMessage);
-
 //     // Emit event for other services to listen to
 //     const event = new CustomEvent('webrtc-signaling', { detail: normalizedMessage });
 //     window.dispatchEvent(event);
@@ -233,7 +209,6 @@
 //   // Listen to WebRTC signaling messages
 //   onSignalingMessage(callback: (message: WebRTCSignalingMessage) => void) {
 //     if (!this.isClient) {
-//       console.warn('ActionCable not available on server side');
 //       return () => {};
 //     }
 

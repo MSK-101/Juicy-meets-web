@@ -24,10 +24,8 @@ export default function StatCard({
   const gradientBackground =
     "linear-gradient(180deg, #2b2b2b 0%, #3f3f3f 50%, #2b2b2b 80%, #5a5a5a 100%)";
 
-
   //lets make it more dark
   const darkBackground = "linear-gradient(180deg, #1a1a1a 0%, #2c2c2c 100%)";
-
 
   return (
     <div

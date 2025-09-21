@@ -15,7 +15,7 @@ export const adminApiFunctions = {
       const data = await adminApi.get<ApiResponse<DashboardData>>('/admin/dashboard');
       return data;
     } catch (error) {
-      console.error('Error fetching dashboard data:', error);
+      
       throw error;
     }
   },
@@ -44,7 +44,7 @@ export const adminApiFunctions = {
       const data = await adminApi.get<ApiResponse<PaginatedResponse<User>>>(`/admin/users?${params}`);
       return data;
     } catch (error) {
-      console.error('Error fetching users:', error);
+      
       throw error;
     }
   },
@@ -54,7 +54,7 @@ export const adminApiFunctions = {
       const data = await adminApi.get<ApiResponse<{ registered: number; inactive: number; newUsers: number }>>('/admin/users/stats');
       return data;
     } catch (error) {
-      console.error('Error fetching user stats:', error);
+      
       throw error;
     }
   },
@@ -88,7 +88,7 @@ export const adminApiFunctions = {
       const data = await adminApi.get<ApiResponse<PaginatedResponse<Video>>>(`/admin/videos?${params}`);
       return data;
     } catch (error) {
-      console.error('Error fetching videos:', error);
+      
       throw error;
     }
   },
@@ -98,7 +98,7 @@ export const adminApiFunctions = {
       const data = await adminApi.get<ApiResponse<{ pools: string[]; sequences: string[] }>>('/admin/videos/filters');
       return data;
     } catch (error) {
-      console.error('Error fetching video filters:', error);
+      
       throw error;
     }
   },
@@ -112,7 +112,7 @@ export const adminApiFunctions = {
       });
       return data;
     } catch (error) {
-      console.error('Error during admin login:', error);
+      
       throw error;
     }
   },

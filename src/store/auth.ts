@@ -80,9 +80,9 @@ export const useAuthStore = create<UserState>()(
           localStorage.removeItem('juicyMeetsUser');
           localStorage.removeItem('juicyMeetsAuthToken');
           localStorage.removeItem('juicyMeetsUserDetails');
-          console.log('🧹 Cleared all authentication data from localStorage');
+          
         } catch (error) {
-          console.error('❌ Error clearing localStorage:', error);
+          
         }
       },
 

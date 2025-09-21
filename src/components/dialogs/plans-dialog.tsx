@@ -60,7 +60,7 @@ export default function PlansDialog({
       const successUrl = `/purchase/success?package=${encodeURIComponent(selectedPackage.name)}&coins=${selectedPackage.coins_count}`;
       router.push(successUrl);
     } catch (error) {
-      console.error("Purchase failed:", error);
+      
       alert("Purchase failed. Please try again.");
     }
   };
@@ -102,8 +102,6 @@ export default function PlansDialog({
               initialSlide={coinPackages.length > 1 ? 1 : 0}
               slidesPerView={1}
               centeredSlides={true}
-              onSlideChange={() => console.log("slide change")}
-              onSwiper={(swiper) => console.log(swiper)}
               breakpoints={{
                 1024: {
                   slidesPerView: 3,

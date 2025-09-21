@@ -37,7 +37,6 @@ export const adminAuthService = {
   login: async (credentials: AdminLoginRequest): Promise<AdminAuthData> => {
     try {
       const response = await adminApi.post("/admin/auth/login", credentials) as AdminLoginResponse;
-      console.log("Admin login response:", response);
 
       // Check if response has the expected structure
       if (response?.success && response?.data?.admin && response?.data?.token) {
@@ -46,11 +45,10 @@ export const adminAuthService = {
           token: response.data.token
         };
       } else {
-        console.error("Unexpected response format:", response);
         throw new Error(response?.message || "Invalid response format from server");
       }
     } catch (error) {
-      console.error("Admin login error:", error);
+      
       throw error;
     }
   },
@@ -59,7 +57,7 @@ export const adminAuthService = {
     try {
       await adminApi.delete("/admin/auth/logout");
     } catch (error) {
-      console.error("Admin logout error:", error);
+      
       throw error;
     }
   },
@@ -77,7 +75,7 @@ export const adminAuthService = {
         throw new Error("Failed to get current admin");
       }
     } catch (error) {
-      console.error("Get current admin error:", error);
+      
       throw error;
     }
   },
@@ -97,7 +95,7 @@ export const adminAuthService = {
         throw new Error(response?.message || "Failed to change password");
       }
     } catch (error) {
-      console.error("Change password error:", error);
+      
       throw error;
     }
   },
@@ -115,7 +113,7 @@ export const adminAuthService = {
         throw new Error("Failed to get admins");
       }
     } catch (error) {
-      console.error("Get admins error:", error);
+      
       throw error;
     }
   },
@@ -139,7 +137,7 @@ export const adminAuthService = {
         throw new Error("Failed to create admin");
       }
     } catch (error) {
-      console.error("Create admin error:", error);
+      
       throw error;
     }
   },
@@ -155,7 +153,7 @@ export const adminAuthService = {
         throw new Error(response?.message || "Failed to delete admin");
       }
     } catch (error) {
-      console.error("Delete admin error:", error);
+      
       throw error;
     }
   },

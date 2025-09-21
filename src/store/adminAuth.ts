@@ -27,11 +27,7 @@ export const useAdminAuthStore = create<AdminState>()(
 
       // Actions
                      setAdmin: (admin: Admin, token: string) => {
-                 console.log("Setting admin in store:", {
-                   admin: admin.email,
-                   token: token ? `${token.substring(0, 20)}...` : 'missing',
-                   fullToken: token
-                 });
+                 
                  set({ admin, token, isLoading: false });
                },
 
@@ -48,9 +44,9 @@ export const useAdminAuthStore = create<AdminState>()(
           localStorage.removeItem('juicy-meets-admin-auth-storage');
           localStorage.removeItem('juicyMeetsAdmin');
           localStorage.removeItem('juicyMeetsAdminToken');
-          console.log('🧹 Cleared all admin authentication data from localStorage');
+          
         } catch (error) {
-          console.error('❌ Error clearing admin localStorage:', error);
+          
         }
       },
 
@@ -76,6 +72,5 @@ export const useUpdateAdmin = () => useAdminAuthStore((state) => state.updateAdm
 export const useAdmin = () => useAdminAuthStore((state) => state.admin);
 export const useAdminToken = () => {
   const token = useAdminAuthStore((state) => state.token);
-  console.log("Getting admin token:", token ? `${token.substring(0, 20)}...` : 'missing');
   return token;
 };

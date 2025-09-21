@@ -62,7 +62,7 @@ export default function Settings() {
       const adminsData = await adminAuthService.getAdmins();
       setAdmins(adminsData);
     } catch (error) {
-      console.error("Error loading admins:", error);
+      
       // Fallback to current admin if API fails
       if (currentAdmin) {
         setAdmins([currentAdmin]);
@@ -113,7 +113,7 @@ export default function Settings() {
 
       alert("Password updated successfully!");
     } catch (error) {
-      console.error("Error updating password:", error);
+      
       alert("Failed to update password. Please try again.");
     } finally {
       setPasswordLoading(false);
@@ -144,7 +144,7 @@ export default function Settings() {
 
       alert("New admin added successfully!");
     } catch (error) {
-      console.error("Error adding new admin:", error);
+      
       alert("Failed to add new admin. Please try again.");
     } finally {
       setNewAdminLoading(false);
@@ -168,7 +168,7 @@ export default function Settings() {
       setAdmins(prev => prev.filter(admin => admin.id !== adminId));
       alert("Admin deleted successfully!");
     } catch (error) {
-      console.error("Error deleting admin:", error);
+      
       alert("Failed to delete admin. Please try again.");
     }
   };

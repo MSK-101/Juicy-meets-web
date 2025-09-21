@@ -27,7 +27,6 @@ export class MockVideoChatService {
 
   constructor() {
     this.userId = this.getAuthenticatedUserId();
-    console.log('🎥 MockVideoChatService initialized with user ID:', this.userId);
   }
 
   private getAuthenticatedUserId(): string | null {
@@ -50,7 +49,7 @@ export class MockVideoChatService {
         return userData.id?.toString() || null;
       }
     } catch (error) {
-      console.warn('Could not parse stored user data');
+      
     }
 
     return null;
@@ -76,15 +75,13 @@ export class MockVideoChatService {
     }
 
     try {
-      console.log('📹 Getting local video stream...');
       this.localStream = await navigator.mediaDevices.getUserMedia({
         video: true,
         audio: true
       });
-      console.log('✅ Got local stream');
       return this.localStream;
     } catch (error) {
-      console.error('❌ Failed to get local stream:', error);
+      
       throw error;
     }
   }
@@ -95,13 +92,11 @@ export class MockVideoChatService {
 
   // Mock join queue - simulates finding a match after 2 seconds
   async joinQueue(): Promise<void> {
-    console.log('🎯 Joining mock video chat queue...');
     this.isWaiting = true;
 
     // Simulate finding a match after 2 seconds
     this.mockMatchTimeout = setTimeout(async () => {
       if (this.isWaiting) {
-        console.log('🎉 Mock match found!');
         await this.simulateMatch();
       }
     }, 2000);
@@ -113,15 +108,12 @@ export class MockVideoChatService {
     this.partnerId = `partner_${Date.now()}`;
     this.isInitiator = Math.random() > 0.5; // Randomly decide who initiates
 
-    console.log('🔄 Starting WebRTC connection as', this.isInitiator ? 'initiator' : 'receiver');
-
     // Start WebRTC connection
     await this.startWebRTCConnection();
   }
 
   private async startWebRTCConnection(): Promise<void> {
     try {
-      console.log('🚀 Starting WebRTC connection...');
 
       // Create peer connection
       await this.createPeerConnection();
@@ -134,14 +126,12 @@ export class MockVideoChatService {
 
       // If initiator, create and send offer
       if (this.isInitiator && this.peerConnection) {
-        console.log('📤 Creating offer...');
         const offer = await this.peerConnection.createOffer({
           offerToReceiveAudio: true,
           offerToReceiveVideo: true
         });
 
         await this.peerConnection.setLocalDescription(offer);
-        console.log('✅ Offer created and set as local description');
 
         // Simulate sending offer and receiving answer after 1 second
         setTimeout(async () => {
@@ -155,7 +145,7 @@ export class MockVideoChatService {
       }
 
     } catch (error) {
-      console.error('❌ Failed to start WebRTC connection:', error);
+      
     }
   }
 
@@ -168,7 +158,6 @@ export class MockVideoChatService {
     });
 
     this.setupPeerConnectionHandlers();
-    console.log('✅ Peer connection created');
   }
 
   private setupPeerConnectionHandlers(): void {
@@ -177,7 +166,6 @@ export class MockVideoChatService {
     // Connection state changes
     this.peerConnection.onconnectionstatechange = () => {
       const state = this.peerConnection!.connectionState;
-      console.log('🔗 Connection state:', state);
 
       if (this.onConnectionStateCallback) {
         this.onConnectionStateCallback(state);
@@ -187,7 +175,6 @@ export class MockVideoChatService {
     // ICE candidates
     this.peerConnection.onicecandidate = (event) => {
       if (event.candidate) {
-        console.log('🧊 ICE candidate generated');
         // In real implementation, this would be sent to the other peer
         // For mock, we'll simulate adding it to the remote peer
         setTimeout(() => {
@@ -200,7 +187,6 @@ export class MockVideoChatService {
 
     // Remote stream
     this.peerConnection.ontrack = (event) => {
-      console.log('📹 Remote stream received');
 
       if (event.streams && event.streams[0]) {
         this.remoteStream = event.streams[0];
@@ -215,8 +201,6 @@ export class MockVideoChatService {
   private async simulateOffer(): Promise<void> {
     if (!this.peerConnection) return;
 
-    console.log('📥 Simulating incoming offer...');
-
     // Create a mock offer
     const offer = await this.peerConnection.createOffer({
       offerToReceiveAudio: true,
@@ -224,12 +208,10 @@ export class MockVideoChatService {
     });
 
     await this.peerConnection.setRemoteDescription(offer);
-    console.log('✅ Remote offer set');
 
     // Create answer
     const answer = await this.peerConnection.createAnswer();
     await this.peerConnection.setLocalDescription(answer);
-    console.log('✅ Answer created and sent');
 
     // Simulate remote peer also setting up their local stream
     setTimeout(() => {
@@ -240,12 +222,9 @@ export class MockVideoChatService {
   private async simulateAnswer(): Promise<void> {
     if (!this.peerConnection) return;
 
-    console.log('📥 Simulating incoming answer...');
-
     // Create a mock answer
     const answer = await this.peerConnection.createAnswer();
     await this.peerConnection.setRemoteDescription(answer);
-    console.log('✅ Remote answer set');
 
     // Simulate remote peer setting up their local stream
     setTimeout(() => {
@@ -256,14 +235,12 @@ export class MockVideoChatService {
   private simulateRemoteStream(): void {
     // For demo purposes, mirror the local stream as remote
     if (this.localStream && this.onRemoteStreamCallback) {
-      console.log('🎭 Simulating remote stream (mirroring local)');
       this.onRemoteStreamCallback(this.localStream);
     }
   }
 
   // Leave chat
   async leaveChat(): Promise<void> {
-    console.log('👋 Leaving mock video chat...');
 
     this.isWaiting = false;
 
@@ -276,7 +253,6 @@ export class MockVideoChatService {
   }
 
   private cleanup(): void {
-    console.log('🧹 Cleaning up...');
 
     if (this.peerConnection) {
       this.peerConnection.close();
@@ -294,7 +270,6 @@ export class MockVideoChatService {
     this.isInitiator = false;
     this.iceCandidateQueue = [];
 
-    console.log('✅ Cleanup complete');
   }
 }
 

@@ -35,14 +35,11 @@ export default function AdminLogin({ onLoginSuccess }: AdminLoginProps) {
       return;
     }
 
-    console.log("Admin login attempt:", { email, password: "***" });
-
     try {
       const result = await adminLogin.mutateAsync({ email, password });
-      console.log("Admin login result:", result);
       onLoginSuccess();
     } catch (error: unknown) {
-      console.error("Admin login error:", error);
+      
       setError(error instanceof Error ? error.message : "Login failed");
     }
   };

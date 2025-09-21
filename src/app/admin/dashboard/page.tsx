@@ -21,7 +21,7 @@ export default function Dashboard() {
         const response = await adminApi.getDashboardData();
         setData(response.data);
       } catch (error) {
-        console.error("Failed to fetch dashboard data:", error);
+        
       } finally {
         setLoading(false);
       }

@@ -22,25 +22,19 @@ export const VideoChat: React.FC<VideoChatProps> = ({ chatId }) => {
   // Check if we're on the client side
   useEffect(() => {
     setIsClient(true);
-    console.log('🌐 Client-side detected');
 
     // Debug: Check service state
-    console.log('🔍 VideoChatService state:', {
-      isClient: videoChatService.isAvailable(),
-      isInitialized: videoChatService.isAvailable()
-    });
+    
   }, []);
 
   const initializeVideoChat = useCallback(async () => {
     // Only run on client side
     if (!isClient) {
-      console.log('⏳ Waiting for client-side initialization...');
       return;
     }
 
     // Prevent multiple initializations
     if (isInitialized || isConnecting) {
-      console.log('🔄 VideoChat already initialized or connecting, skipping...');
       return;
     }
 
@@ -53,33 +47,23 @@ export const VideoChat: React.FC<VideoChatProps> = ({ chatId }) => {
       if (!currentUserId) {
         currentUserId = `user-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
         setUserId(currentUserId);
-        console.log('🆔 Generated random user ID:', currentUserId);
       }
 
-      console.log('🚀 Initializing video chat for:', chatId);
-      console.log('👤 User ID:', currentUserId);
-
       // Step 1: Set user credentials FIRST
-      console.log('🔑 Setting user credentials...');
       videoChatService.setUserCredentials(currentUserId, 'fake-auth-token-for-testing');
-      console.log('✅ User credentials set');
 
       // Step 2: NOW check if service is available
       if (!videoChatService.isAvailable()) {
         throw new Error('VideoChatService not available after setting credentials');
       }
-      console.log('✅ VideoChatService is available');
 
       // Step 3: Create connection
-      console.log('🔗 Creating video chat connection...');
       const newConnection = await videoChatService.createConnection(chatId);
       setConnection(newConnection);
       setIsInitialized(true);
 
-      console.log('✅ Video chat initialized successfully');
-
     } catch (err) {
-      console.error('❌ Error initializing video chat:', err);
+      
       setError(err instanceof Error ? err.message : 'Failed to initialize video chat');
       setIsInitialized(false);
     } finally {
@@ -102,7 +86,6 @@ export const VideoChat: React.FC<VideoChatProps> = ({ chatId }) => {
   useEffect(() => {
     if (connection?.localStream && localVideoRef.current) {
       localVideoRef.current.srcObject = connection.localStream;
-      console.log('📹 Local video stream attached');
     }
   }, [connection?.localStream]);
 
@@ -111,14 +94,12 @@ export const VideoChat: React.FC<VideoChatProps> = ({ chatId }) => {
     if (connection?.remoteStream && remoteVideoRef.current) {
       remoteVideoRef.current.srcObject = connection.remoteStream;
       setHasRemoteStream(true);
-      console.log('📹 Remote video stream attached');
     }
   }, [connection?.remoteStream]);
 
   // Listen for remote stream events
   useEffect(() => {
     const handleRemoteStream = (event: CustomEvent) => {
-      console.log('📺 Remote stream event received:', event.detail);
 
       if (event.detail.chatId === chatId) {
         const updatedConnection = videoChatService.getConnection(chatId);

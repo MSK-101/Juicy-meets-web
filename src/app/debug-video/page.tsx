@@ -21,7 +21,6 @@ export default function DebugVideoPage() {
     if (!userId) return;
 
     try {
-      console.log('🚀 Initializing debug connection...');
 
       // Set credentials
       videoChatService.setUserCredentials(userId, 'debug-token');
@@ -30,9 +29,8 @@ export default function DebugVideoPage() {
       await videoChatService.createConnection(chatId);
       setIsInitialized(true);
 
-      console.log('✅ Debug connection initialized');
     } catch (error) {
-      console.error('❌ Error initializing debug connection:', error);
+      
     }
   };
 
@@ -45,14 +43,12 @@ export default function DebugVideoPage() {
     // pubnubService.getOnlineUsers().then(users => {
     //   setOnlineUsers(users);
     // });
-    console.log('👥 Online users not yet implemented');
   };
 
   const forcePresenceSync = async () => {
     // TODO: Implement forcePresenceSync method
     // await pubnubService.forcePresenceSync();
     // setTimeout(refreshInfo, 1000);
-    console.log('🔄 Force presence sync not yet implemented');
   };
 
   useEffect(() => {

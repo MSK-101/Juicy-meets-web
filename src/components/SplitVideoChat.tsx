@@ -21,126 +21,30 @@ export const SplitVideoChat: React.FC<SplitVideoChatProps> = ({
   isConnecting,
   error
 }) => {
-  const [hasRemoteStream, setHasRemoteStream] = useState(false);
-
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
 
-  // Handle local video stream
+  // Handle local video stream - SIMPLE
   useEffect(() => {
     if (localStream && localVideoRef.current) {
-      try {
-        localVideoRef.current.srcObject = localStream;
-        // Force video element to load
-        localVideoRef.current.load();
-
-        // Ensure video plays
-        localVideoRef.current.play().then(() => {
-          console.log('✅ Local video started playing successfully');
-        }).catch(error => {
-          console.warn('⚠️ Could not autoplay local video:', error);
-        });
-
-      } catch (error) {
-        console.error('❌ Error setting local stream on video element:', error);
-      }
-    } else if (localStream) {
-      // Wait a bit and try again
-      setTimeout(() => {
-        if (localStream && localVideoRef.current) {
-          console.log('🔄 Retrying to set local stream after delay...');
-          try {
-            localVideoRef.current.srcObject = localStream;
-            localVideoRef.current.load();
-            localVideoRef.current.play().catch(console.warn);
-            console.log('✅ Local stream set on retry');
-          } catch (error) {
-            console.error('❌ Error on retry:', error);
-          }
-        }
-      }, 100);
-    } else {
-      console.log('⚠️ No local stream available');
+      localVideoRef.current.srcObject = localStream;
+      localVideoRef.current.play().catch(() => {});
     }
   }, [localStream]);
 
-  // Handle remote video stream
+  // Handle remote video stream - SIMPLE
   useEffect(() => {
-    if (!remoteStream) {
-      console.log('⚠️ No remote stream available');
-      setHasRemoteStream(false);
-      return;
+    if (remoteStream && remoteVideoRef.current) {
+      console.log('📺 SplitVideoChat: Assigning remote stream tracks:', remoteStream.getTracks().length);
+      remoteVideoRef.current.srcObject = remoteStream;
+      remoteVideoRef.current.play().catch(() => {});
+      console.log('✅ SplitVideoChat: Remote stream assigned');
+    } else if (!remoteStream && remoteVideoRef.current) {
+      console.log('📺 SplitVideoChat: Clearing remote stream');
+      remoteVideoRef.current.srcObject = null;
     }
-
-    // SIMPLE AND DIRECT: Just assign the stream immediately
-    if (remoteVideoRef.current && remoteStream) {
-      console.log('📺 Setting remote stream on video element');
-      console.log('📺 Remote stream tracks:', remoteStream.getTracks().length);
-      console.log('📺 Remote stream active:', remoteStream.active);
-
-      try {
-        // Direct assignment - no complex logic
-        remoteVideoRef.current.srcObject = remoteStream;
-
-        // Force video to load and play
-        remoteVideoRef.current.load();
-
-        // Set state immediately
-        setHasRemoteStream(true);
-
-        // Force play after a short delay
-        setTimeout(() => {
-          if (remoteVideoRef.current) {
-            remoteVideoRef.current.play().catch(e =>
-              console.log('⚠️ Autoplay failed (normal):', e)
-            );
-          }
-        }, 100);
-
-        console.log('✅ Remote stream assigned successfully');
-        return;
-      } catch (error) {
-        console.error('❌ Error setting remote stream:', error);
-        setHasRemoteStream(false);
-      }
-    }
-
-    // If video ref not ready, wait and retry once
-    const retryTimeout = setTimeout(() => {
-      if (remoteVideoRef.current && remoteStream) {
-        console.log('📺 Retry: Setting remote stream on video element');
-        remoteVideoRef.current.srcObject = remoteStream;
-        setHasRemoteStream(true);
-        console.log('✅ Remote stream assigned on retry');
-      } else {
-        console.log('❌ Failed to assign remote stream after retry');
-        setHasRemoteStream(false);
-      }
-    }, 100);
-
-    return () => clearTimeout(retryTimeout);
   }, [remoteStream]);
 
-  // Update remote stream availability when stream changes
-  useEffect(() => {
-    console.log('🔄 Remote stream changed:', {
-      hasStream: !!remoteStream,
-      streamActive: remoteStream?.active,
-      trackCount: remoteStream?.getTracks().length,
-      videoTracks: remoteStream?.getVideoTracks().length,
-      audioTracks: remoteStream?.getAudioTracks().length
-    });
-    setHasRemoteStream(!!remoteStream);
-  }, [remoteStream]);
-
-  // Use chatId for logging context
-  useEffect(() => {
-    if (showRemote) {
-      console.log(`📺 Remote video component initialized for chat: ${chatId}`);
-    } else {
-      console.log(`📹 Local video component initialized for chat: ${chatId}`);
-    }
-  }, [chatId, showRemote]);
 
   if (error) {
     return (
@@ -164,7 +68,7 @@ export const SplitVideoChat: React.FC<SplitVideoChatProps> = ({
   if (showRemote) {
     return (
       <div className="w-full h-full relative bg-gray-900">
-        {hasRemoteStream && remoteStream ? (
+        {remoteStream ? (
           <div className="w-full h-full relative">
             <video
               ref={remoteVideoRef}

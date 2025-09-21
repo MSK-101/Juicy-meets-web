@@ -52,7 +52,7 @@ export default function EditStaff() {
       const staffData = await staffService.getStaffMember(staffId);
       setFormData(staffData);
     } catch (error) {
-      console.error("Failed to fetch staff data:", error);
+      
       setError("Failed to fetch staff data. Please try again.");
     } finally {
       setLoading(false);
@@ -105,7 +105,7 @@ export default function EditStaff() {
         setError("Failed to update staff member");
       }
     } catch (error) {
-      console.error("Error updating staff:", error);
+      
       setError(error instanceof Error ? error.message : "Failed to update staff member");
     } finally {
       setSaving(false);
@@ -256,8 +256,6 @@ export default function EditStaff() {
               </select>
             </div>
 
-
-
             {/* Status */}
             <div className="space-y-2">
               <label htmlFor="status" className="block text-sm font-medium text-gray-700 font-poppins">
@@ -274,7 +272,6 @@ export default function EditStaff() {
                 <option value="inactive">Inactive</option>
               </select>
             </div>
-
 
           </div>
 

@@ -50,21 +50,19 @@ export default function Home() {
             // If a new token was provided (auto-login), update localStorage
             if (validation.token) {
               localStorage.setItem('juicyMeetsAuthToken', validation.token);
-              console.log('🔄 Token refreshed via auto-login');
             }
 
             startChat();
             return;
           } else {
             // Token is invalid, clear storage and show dialog
-            console.log('❌ Stored token is invalid:', validation.message);
             userService.clearUserFromLocalStorage();
             setUserDetailsDialog(true);
             return;
           }
         } catch (error) {
           // Validation failed, clear storage and show dialog
-          console.error('❌ Token validation failed:', error);
+
           userService.clearUserFromLocalStorage();
           setUserDetailsDialog(true);
           return;
@@ -143,7 +141,6 @@ export default function Home() {
         >
           START VIDEO CHAT
         </button>
-
 
         <UserDetailsDialog
           showDialog={showUserDetailsDialog}

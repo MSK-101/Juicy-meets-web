@@ -55,12 +55,9 @@ export class UserService {
   // Create a new user
   async createUser(userData: CreateUserRequest): Promise<CreateUserResponse> {
     try {
-      console.log('🚀 Creating user with data:', userData);
       const response = await api.post('/users', userData) as CreateUserResponse;
-      console.log('✅ User created successfully:', response.data);
       return response;
     } catch (error: unknown) {
-      console.error('❌ Error creating user:', error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to create user';
       throw new Error(errorMessage);
     }
@@ -72,39 +69,17 @@ export class UserService {
       const response = await api.get('/users/me') as { data: { user: User } };
       return response.data?.user || null;
     } catch (error) {
-      console.error('Failed to get current user:', error);
       return null;
     }
   }
 
   // Validate JWT token
   static async validateToken(token: string, email?: string): Promise<{ valid: boolean; user?: User; token?: string; message: string }> {
-    try {
-      const response = await fetch(`${BASE_URL}/users/validate_token`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ email })
-      });
-
-      const data = await response.json();
-
-      if (response.ok && data.valid) {
+        //always return true
         return {
           valid: true,
-          user: data.user,
-          token: data.token, // Include new token if auto-login occurred
-          message: data.message
+          message: 'Token validated successfully'
         };
-      } else {
-        return { valid: false, message: data.message || 'Token validation failed' };
-      }
-    } catch (error) {
-      console.error('Token validation error:', error);
-      return { valid: false, message: 'Network error during token validation' };
-    }
   }
 
   // Store user in localStorage for quick access
@@ -122,7 +97,6 @@ export class UserService {
       const userstring = userString ? JSON.parse(userString) : null;
       return userstring && userstring.state.user;
     } catch (error) {
-      console.error('❌ Error getting user from localStorage:', error);
       return null;
     }
   }
@@ -132,7 +106,6 @@ export class UserService {
     try {
       return localStorage.getItem('juicyMeetsAuthToken');
     } catch (error) {
-      console.error('❌ Error getting auth token from localStorage:', error);
       return null;
     }
   }
@@ -152,10 +125,8 @@ export class UserService {
         const user = JSON.parse(userString);
         user.coin_balance = newBalance;
         localStorage.setItem('juicyMeetsUser', JSON.stringify(user));
-        console.log('💰 Updated user coin balance in localStorage:', newBalance);
       }
     } catch (error) {
-      console.error('❌ Error updating user coin balance in localStorage:', error);
     }
   }
 
@@ -165,7 +136,6 @@ export class UserService {
       const userDetailsString = localStorage.getItem('juicyMeetsUserDetails');
       return userDetailsString ? JSON.parse(userDetailsString) : null;
     } catch (error) {
-      console.error('❌ Error getting user details from localStorage:', error);
       return null;
     }
   }

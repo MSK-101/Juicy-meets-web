@@ -23,20 +23,14 @@ export const useCurrentAdmin = () => {
 // Mutation hooks (for changing data)
 export const useAdminLogin = () => {
   const setAdmin = useSetAdmin();
-   console.log("useAdminLogin");
   return useMutation({
     mutationFn: (credentials: AdminLoginRequest) => adminAuthService.login(credentials),
     onSuccess: (response) => {
-      console.log("Admin login success:", {
-        admin: response.admin.email,
-        token: response.token ? `${response.token.substring(0, 20)}...` : 'missing',
-        fullResponse: response
-      });
+      
       // Update Zustand store with admin data and token
       setAdmin(response.admin, response.token);
     },
     onError: (error) => {
-      console.error("Admin login failed:", error);
     },
   });
 };

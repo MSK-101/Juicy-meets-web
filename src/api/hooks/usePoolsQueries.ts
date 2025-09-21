@@ -65,7 +65,6 @@ export const useCreatePool = () => {
       queryClient.invalidateQueries({ queryKey: poolsKeys.lists() });
     },
     onError: (error) => {
-      console.error("Create pool failed:", error);
     },
   });
 };
@@ -82,7 +81,6 @@ export const useUpdatePool = () => {
       queryClient.invalidateQueries({ queryKey: poolsKeys.lists() });
     },
     onError: (error) => {
-      console.error("Update pool failed:", error);
     },
   });
 };
@@ -97,7 +95,6 @@ export const useDeletePool = () => {
       queryClient.invalidateQueries({ queryKey: poolsKeys.lists() });
     },
     onError: (error) => {
-      console.error("Delete pool failed:", error);
     },
   });
 };
@@ -114,7 +111,6 @@ export const useCreateSequence = () => {
       queryClient.invalidateQueries({ queryKey: poolsKeys.detail(poolId) });
     },
     onError: (error) => {
-      console.error("Create sequence failed:", error);
     },
   });
 };
@@ -132,7 +128,6 @@ export const useUpdateSequence = () => {
       queryClient.invalidateQueries({ queryKey: poolsKeys.detail(poolId) });
     },
     onError: (error) => {
-      console.error("Update sequence failed:", error);
     },
   });
 };
@@ -149,7 +144,6 @@ export const useDeleteSequence = () => {
       queryClient.invalidateQueries({ queryKey: poolsKeys.detail(poolId) });
     },
     onError: (error) => {
-      console.error("Delete sequence failed:", error);
     },
   });
 };
@@ -166,7 +160,6 @@ export const useReorderSequences = () => {
       queryClient.invalidateQueries({ queryKey: poolsKeys.detail(poolId) });
     },
     onError: (error) => {
-      console.error("Reorder sequences failed:", error);
     },
   });
 };

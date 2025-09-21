@@ -64,7 +64,6 @@ export default function UserDetailsDialog({
         }
       };
 
-      console.log('🚀 Creating user account...', userData);
       const response = await userService.createUser(userData);
 
       if (response.success) {
@@ -80,28 +79,20 @@ export default function UserDetailsDialog({
 
         // Update auth store with user data and token
         const userWithToken = { ...response.data.user, token: response.data.token };
-        console.log('🔑 Storing user with token in auth store:', userWithToken);
         setUser(userWithToken);
 
         // Verify the token was stored
         setTimeout(() => {
           const storedToken = localStorage.getItem('juicyMeetsAuthToken');
           const authStoreUser = useAuthStore.getState().user;
-          console.log('🔍 Verification - Stored token:', storedToken ? 'Yes' : 'No');
-          console.log('🔍 Verification - Auth store user:', authStoreUser);
-          console.log('🔍 Verification - Auth store token:', authStoreUser?.token ? 'Yes' : 'No');
         }, 100);
-
-        console.log('✅ User created successfully:', response.data.user);
-        console.log('💰 Free coins:', response.data.free_coins);
-        console.log('🔑 Token received:', response.data.token ? 'Yes' : 'No');
 
         return response.data.user;
       } else {
         throw new Error('Failed to create user account');
       }
     } catch (err: unknown) {
-      console.error('❌ Error creating user:', err);
+      
       const errorMessage = err instanceof Error ? err.message : 'Failed to create account. Please try again.';
       setError(errorMessage);
       throw err;
@@ -125,7 +116,7 @@ export default function UserDetailsDialog({
       router.push(`/chat/${randomId}`);
     } catch (err) {
       // Error is already handled in createUserAccount
-      console.error('❌ Failed to continue with free account:', err);
+      
     }
   };
 
@@ -140,7 +131,7 @@ export default function UserDetailsDialog({
       setShowPlansDialog(true);
     } catch (err) {
       // Error is already handled in createUserAccount
-      console.error('❌ Failed to start premium trial:', err);
+      
     }
   };
 

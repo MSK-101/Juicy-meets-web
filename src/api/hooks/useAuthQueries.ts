@@ -33,7 +33,6 @@ export const useLogin = () => {
       setUser({ ...response.user, token: response.token });
     },
     onError: (error) => {
-      console.error("Login failed:", error);
     },
   });
 };
@@ -42,7 +41,6 @@ export const useRegister = () => {
   return useMutation({
     mutationFn: (credentials: RegisterRequest) => authService.register(credentials),
     onError: (error) => {
-      console.error("Registration failed:", error);
     },
   });
 };
@@ -51,7 +49,6 @@ export const useForgotPassword = () => {
   return useMutation({
     mutationFn: (request: ForgotPasswordRequest) => authService.forgotPassword(request),
     onError: (error) => {
-      console.error("Forgot password failed:", error);
     },
   });
 };

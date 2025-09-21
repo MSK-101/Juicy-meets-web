@@ -7,10 +7,8 @@ export const useCreatePurchase = () => {
   return useMutation({
     mutationFn: (data: CreatePurchaseRequest) => purchaseService.createPurchase(data),
     onSuccess: (data) => {
-      console.log("Purchase created successfully:", data);
     },
     onError: (error) => {
-      console.error("Create purchase failed:", error);
     },
   });
 };

@@ -35,9 +35,9 @@ class CoinDeductionService {
     try {
       const response = await api.get('/video_chat/deduction_rules') as { rules: DeductionRule[] };
       this.activeRules = response.rules || [];
-      console.log('💰 Loaded deduction rules:', this.activeRules);
+      
     } catch (error) {
-      console.error('❌ Failed to load deduction rules:', error);
+      
       this.activeRules = [];
     }
   }
@@ -56,9 +56,7 @@ class CoinDeductionService {
       this.durationCheckInterval = setInterval(() => {
         this.checkAndApplyDeductions();
       }, 1000);
-      console.log('⏱️ Started chat duration tracking (user has coins)');
     } else {
-      console.log('💰 User has no coins - skipping duration tracking entirely');
     }
   }
 
@@ -71,7 +69,6 @@ class CoinDeductionService {
     this.chatStartTime = null;
     this.appliedThresholds.clear();
     this.isBalanceZero = false; // Reset for next session
-    console.log('⏱️ Stopped chat duration tracking');
   }
 
   // Check and apply deductions based on current duration - OPTIMIZED
@@ -83,32 +80,28 @@ class CoinDeductionService {
     // Check each rule to see if we've reached the threshold
     for (const rule of this.activeRules) {
       if (currentDuration === rule.threshold_seconds && !this.appliedThresholds.has(rule.threshold_seconds)) {
-        console.log(`🎯 Chat duration reached ${rule.threshold_seconds}s, applying deduction rule: ${rule.name}`);
 
         try {
           const result = await this.applyDurationDeduction(currentDuration);
 
           if (result.success) {
             this.appliedThresholds.add(rule.threshold_seconds);
-            console.log(`✅ Applied deduction: ${result.deducted} coins, new balance: ${result.new_balance}`);
 
             // Update cached balance
             this.currentBalance = result.new_balance;
             if (result.new_balance <= 0) {
               this.isBalanceZero = true;
-              console.log('💰 Balance reached zero - stopping future deduction checks');
               this.stopDurationTracking();
             }
 
             // Emit event for UI updates
             this.emitDeductionApplied(result);
           } else {
-            console.warn(`⚠️ Failed to apply deduction for rule ${rule.name}: ${result.error || 'Unknown error'}`);
             // Emit error event for UI feedback
             this.emitDeductionError(result);
           }
         } catch (error) {
-          console.error(`❌ Failed to apply deduction for rule ${rule.name}:`, error);
+          
           // Emit error event for UI feedback
           this.emitDeductionError({
             success: false,
@@ -132,7 +125,7 @@ class CoinDeductionService {
 
       return response;
     } catch (error) {
-      console.error('❌ Failed to apply duration deduction:', error);
+      
       throw error;
     }
   }
@@ -143,7 +136,7 @@ class CoinDeductionService {
       const response = await api.get('/video_chat/user_balance') as { balance: number };
       return response.balance;
     } catch (error) {
-      console.error('❌ Failed to get user balance:', error);
+      
       return 0;
     }
   }
@@ -156,12 +149,10 @@ class CoinDeductionService {
       this.lastBalanceCheck = Date.now();
 
       if (this.isBalanceZero) {
-        console.log('💰 User balance is zero - no deductions needed');
       } else {
-        console.log(`💰 Current balance: ${this.currentBalance} coins`);
       }
     } catch (error) {
-      console.error('❌ Failed to update balance cache:', error);
+      
       this.isBalanceZero = true; // Fail-safe: assume no balance
     }
   }
@@ -171,7 +162,6 @@ class CoinDeductionService {
     if (this.durationCheckInterval) {
       clearInterval(this.durationCheckInterval);
       this.durationCheckInterval = null;
-      console.log('⏹️ Stopped duration tracking (balance exhausted)');
     }
   }
 

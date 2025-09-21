@@ -31,7 +31,6 @@ export const useApiError = (): UseApiErrorReturn => {
   }, []);
 
   const handleApiError = useCallback((error: unknown) => {
-    console.error("API Error:", error);
 
     if (error instanceof AdminAPIError) {
       // Handle structured API errors

@@ -122,6 +122,3 @@ export const monetizationService = {
   },
 };
 
-
-
-

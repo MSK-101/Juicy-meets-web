@@ -4,8 +4,6 @@ import { useErrorStore } from "@/store/error";
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api/v1";
 
 // Debug: Log the BASE_URL being used
-console.log('🔍 BASE_URL:', BASE_URL);
-console.log('🔍 NEXT_PUBLIC_API_URL env var:', process.env.NEXT_PUBLIC_API_URL);
 
 export class APIError extends Error {
   constructor(message: string, public status: number, public response?: unknown) {
@@ -22,18 +20,14 @@ export const apiRequest = async (
   let token = user?.token;
   let userEmail: string | undefined;
 
-  console.log('🔍 API Request Debug:', { endpoint, hasUserToken: !!user?.token, hasUser: !!user });
-
   // If no token in auth store, try to get from localStorage
   if (!token) {
     try {
       const storedToken = localStorage.getItem('juicyMeetsAuthToken');
       if (storedToken) {
         token = storedToken;
-        console.log('🔍 Retrieved token from localStorage');
       }
     } catch {
-      console.warn('Could not access localStorage for token');
     }
   }
 
@@ -48,12 +42,8 @@ export const apiRequest = async (
         userEmail = userData.email;
       }
     } catch {
-      console.warn('Could not access localStorage for user email');
     }
   }
-
-  console.log('🔍 Final token for request:', token ? 'Present' : 'Missing');
-  console.log('🔍 User email for auto-login:', userEmail ? 'Present' : 'Missing');
 
   // Prepare request body with email for auto-login
   let requestBody = options.body;
@@ -64,7 +54,7 @@ export const apiRequest = async (
         bodyData.email = userEmail;
         requestBody = JSON.stringify(bodyData);
       } catch (error) {
-        console.warn('Could not add email to request body:', error);
+        
       }
     } else if (options.method === 'POST' && !requestBody) {
       // If no body exists, create one with just the email
@@ -91,22 +81,16 @@ export const apiRequest = async (
     },
   };
 
-  console.log('🔍 Request headers:', config.headers);
-
   try {
     const fullUrl = `${BASE_URL}${endpoint}`;
-    console.log('🔍 Making request to:', fullUrl);
     const response = await fetch(fullUrl, config);
     const contentType = response.headers.get("content-type");
     const isJSON = contentType?.includes("application/json");
     const data = isJSON ? await response.json() : await response.text();
 
-    console.log('🔍 Response status:', response.status, 'for endpoint:', endpoint);
-
     // Check for new token in response headers (auto-login token refresh)
     const newToken = response.headers.get("X-New-Token");
     if (newToken) {
-      console.log("🔄 Received new token from auto-login, updating store");
       const { setUser } = useAuthStore.getState();
       if (user) {
         setUser({ ...user, token: newToken });
@@ -115,7 +99,6 @@ export const apiRequest = async (
 
     // Also check for new token in response body (for validate_token endpoint)
     if (isJSON && data && typeof data === 'object' && 'token' in data && data.token) {
-      console.log("🔄 Received new token in response body, updating store");
       const { setUser } = useAuthStore.getState();
       if (user) {
         setUser({ ...user, token: data.token });

@@ -15,7 +15,6 @@ export const CleanVideoChat: React.FC = () => {
   useEffect(() => {
     // Set up event listeners
     cleanVideoChatService.onRemoteStream((stream) => {
-      console.log('🎥 Remote stream received in component');
       if (remoteVideoRef.current) {
         remoteVideoRef.current.srcObject = stream;
       }
@@ -23,11 +22,9 @@ export const CleanVideoChat: React.FC = () => {
 
     // Handle video matches (pre-recorded videos)
     cleanVideoChatService.onVideoMatch((videoData) => {
-      console.log('🎥 Video match received:', videoData);
 
       // For video matches, set the video URL directly on the remote video element
       if (remoteVideoRef.current) {
-        console.log('🎥 Setting video URL on remote video element:', videoData.videoUrl);
 
         // Clear any existing stream
         remoteVideoRef.current.srcObject = null;
@@ -38,10 +35,8 @@ export const CleanVideoChat: React.FC = () => {
 
         // Play the video
         remoteVideoRef.current.play().then(() => {
-          console.log('✅ Video started playing successfully');
           setStatus('connected');
         }).catch(error => {
-          console.warn('⚠️ Could not autoplay video:', error);
           // Still set status to connected even if autoplay fails
           setStatus('connected');
         });
@@ -49,7 +44,6 @@ export const CleanVideoChat: React.FC = () => {
     });
 
     cleanVideoChatService.onConnectionStateChange((state) => {
-      console.log('🔗 Connection state changed:', state);
       if (state === 'disconnected') {
         //trigger swipe to next
         (async () => {
@@ -72,7 +66,6 @@ export const CleanVideoChat: React.FC = () => {
     });
 
     cleanVideoChatService.onPartnerLeft(() => {
-      console.log('👋 Partner left');
       setStatus('idle');
       setError('Partner left the chat');
     });
@@ -98,7 +91,7 @@ export const CleanVideoChat: React.FC = () => {
       await cleanVideoChatService.joinQueue();
       setStatus('waiting');
     } catch (err) {
-      console.error('❌ Failed to start video chat:', err);
+      
       setError(err instanceof Error ? err.message : 'Failed to start video chat');
       setStatus('error');
     }
@@ -119,7 +112,7 @@ export const CleanVideoChat: React.FC = () => {
         remoteVideoRef.current.src = ''; // Clear video URL as well
       }
     } catch (err) {
-      console.error('❌ Failed to stop video chat:', err);
+      
     }
   };
 

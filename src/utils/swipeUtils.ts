@@ -33,7 +33,6 @@ export const nextSwipe = async (
     coinDeductionService.stopChatDurationTracking();
 
     const result = await cleanVideoChatService.swipeToNext();
-    console.log('🔄 Swipe result:', result);
 
     // Return the result including swipe deduction info
     const swipeResult = {
@@ -48,7 +47,6 @@ export const nextSwipe = async (
 
     // Handle updated user info if provided
     if (result.updatedUserInfo) {
-      console.log('🔍 Updating user info from swipe result:', result.updatedUserInfo);
 
       // Import and update auth store
       const { useAuthStore } = await import('../store/auth');
@@ -64,7 +62,6 @@ export const nextSwipe = async (
         authStore.setPoolId(result.updatedUserInfo.pool_id);
       }
 
-      console.log('✅ Auth store updated with new sequence info from swipe');
     }
 
     if (result.success) {

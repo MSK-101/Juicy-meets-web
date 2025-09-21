@@ -94,7 +94,7 @@ export default function AddStaff() {
         setError("Failed to create staff member");
       }
     } catch (error) {
-      console.error("Error creating staff:", error);
+      
       setError(error instanceof Error ? error.message : "Failed to create staff member");
     } finally {
       setSaving(false);
@@ -235,8 +235,6 @@ export default function AddStaff() {
                 ))}
               </select>
             </div>
-
-
 
             {/* Status */}
             <div className="space-y-2">

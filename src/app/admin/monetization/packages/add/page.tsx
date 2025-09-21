@@ -67,7 +67,7 @@ export default function AddPackage() {
       await monetizationService.createCoinPackage(formData);
       router.push("/admin/monetization");
     } catch (error) {
-      console.error("Failed to create package:", error);
+      
       setErrors({ general: "Failed to create package. Please try again." });
     } finally {
       setLoading(false);

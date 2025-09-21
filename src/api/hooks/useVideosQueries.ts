@@ -56,7 +56,6 @@ export const useCreateVideo = () => {
       queryClient.invalidateQueries({ queryKey: videosKeys.lists() });
     },
     onError: (error) => {
-      console.error("Failed to create video:", error);
     },
   });
 };
@@ -73,7 +72,6 @@ export const useUpdateVideo = () => {
       queryClient.invalidateQueries({ queryKey: videosKeys.detail(id) });
     },
     onError: (error) => {
-      console.error("Failed to update video:", error);
     },
   });
 };
@@ -88,7 +86,6 @@ export const useDeleteVideo = () => {
       queryClient.invalidateQueries({ queryKey: videosKeys.lists() });
     },
     onError: (error) => {
-      console.error("Failed to delete video:", error);
     },
   });
 };

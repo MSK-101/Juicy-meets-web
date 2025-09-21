@@ -100,8 +100,6 @@ export const VideoChatDebug: React.FC = () => {
     }
   };
 
-
-
   const clearLogs = () => {
     setLogs([]);
   };
@@ -130,7 +128,6 @@ export const VideoChatDebug: React.FC = () => {
           </div>
         </div>
 
-
       </div>
 
       <div className="mb-4">
@@ -157,8 +154,6 @@ export const VideoChatDebug: React.FC = () => {
         >
           Test PubNub
         </button>
-
-
 
         <button
           onClick={resetConnection}

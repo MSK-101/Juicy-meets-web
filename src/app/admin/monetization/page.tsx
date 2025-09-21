@@ -22,15 +22,13 @@ export default function Monetization() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        console.log("🔄 Fetching monetization data for dateFilter:", dateFilter);
         setLoading(true);
         dataLoadedRef.current = false;
         const monetizationData = await monetizationService.getMonetizationData(dateFilter);
-        console.log("✅ Monetization data fetched successfully");
         setData(monetizationData);
         dataLoadedRef.current = true;
       } catch (error) {
-        console.error("❌ Failed to fetch monetization data:", error);
+        
       } finally {
         setLoading(false);
       }
@@ -42,17 +40,14 @@ export default function Monetization() {
   useEffect(() => {
     const fetchTransactions = async () => {
       if (!dataLoadedRef.current) {
-        console.log("⏳ Skipping transaction fetch - data not loaded yet");
         return;
       }
 
       try {
-        console.log("🔄 Fetching transactions for transactionDateFilter:", transactionDateFilter);
         const transactions = await monetizationService.getTransactionHistory(transactionDateFilter);
-        console.log("✅ Transactions fetched successfully");
         setData(prev => prev ? { ...prev, transactions } : null);
       } catch (error) {
-        console.error("❌ Failed to fetch transaction data:", error);
+        
       }
     };
 
@@ -120,7 +115,7 @@ export default function Monetization() {
         const monetizationData = await monetizationService.getMonetizationData(dateFilter);
         setData(monetizationData);
       } catch (error) {
-        console.error("Failed to delete package:", error);
+        
         alert("Failed to delete package. Please try again.");
       }
     }

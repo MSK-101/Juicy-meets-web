@@ -29,7 +29,7 @@ export default function PaidStaff() {
       const staffData = await staffService.getStaff();
       setStaff(staffData);
     } catch (error) {
-      console.error("Failed to fetch staff data:", error);
+      
       setError("Failed to fetch staff data. Please try again.");
     } finally {
       setLoading(false);

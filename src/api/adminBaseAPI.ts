@@ -28,11 +28,8 @@ export const adminApiRequest = async <T = unknown>(
         adminEmail = adminData?.state?.admin?.email;
       }
     } catch {
-      console.warn('Could not access localStorage for admin email');
     }
   }
-
-  console.log('🔍 Admin API Request Debug:', { endpoint, hasToken: !!token, hasEmail: !!adminEmail });
 
   // Check if the body is FormData
   const isFormData = options.body instanceof FormData;
@@ -46,7 +43,7 @@ export const adminApiRequest = async <T = unknown>(
         bodyData.email = adminEmail;
         requestBody = JSON.stringify(bodyData);
       } catch (error) {
-        console.warn('Could not add email to admin request body:', error);
+        
       }
     } else if (options.method === 'POST' && !requestBody) {
       // If no body exists, create one with just the email
@@ -58,7 +55,6 @@ export const adminApiRequest = async <T = unknown>(
       endpoint = modifiedEndpoint;
     }
   }
-  console.log('🔍 Request body:', requestBody);
   const config: RequestInit = {
     ...options,
     body: requestBody,
@@ -80,7 +76,6 @@ export const adminApiRequest = async <T = unknown>(
     // Check for new token in response headers (auto-login token refresh)
     const newToken = response.headers.get("X-New-Token");
     if (newToken) {
-      console.log("🔄 Received new token from auto-login, updating store");
       const { setAdmin } = useAdminAuthStore.getState();
       if (adminAuth.admin) {
         setAdmin(adminAuth.admin, newToken);
