@@ -39,7 +39,7 @@ export class CleanVideoChatService {
   // Frontend connection timeout handling
   private connectionTimeoutId: NodeJS.Timeout | null = null;
   private connectionStartTime: number | null = null;
-  private readonly CONNECTION_TIMEOUT_MS = 8000; // 8 seconds - much faster
+  private readonly CONNECTION_TIMEOUT_MS = 15000; // 15 seconds - increased for better reliability
 
   // Track processed signals to prevent duplicates
   private processedSignals = new Set<string>();
@@ -453,6 +453,7 @@ export class CleanVideoChatService {
         status: string;
         room_id: string;
         match_type: string;
+        actual_match_type?: string;
         partner: { id: string };
         is_initiator: boolean;
         session_id?: string;
@@ -511,23 +512,19 @@ export class CleanVideoChatService {
         this.isInitiator = responseData.is_initiator;
         this.sessionVersion = responseData.session_version || '';
 
-        // CRITICAL FIX: Determine match type BEFORE processing to avoid conflicts
-        let actualMatchType = 'unknown';
+        // CRITICAL FIX: Use actual_match_type from backend for proper detection
+        let actualMatchType = responseData.actual_match_type || responseData.match_type || 'unknown';
 
-        // Video match detection - prioritize video_id presence
-        if (responseData.video_id && responseData.video_url) {
-          actualMatchType = 'video';
-        }
-        // Live connection detection - partner with real ID
-        else if (responseData.partner &&
-                 responseData.partner.id &&
-                 responseData.partner.id !== 'video' &&
-                 responseData.partner.id !== 'unknown') {
+        // Additional validation for video matches
+        if (actualMatchType === 'video' && (!responseData.video_id || !responseData.video_url)) {
+          console.log('⚠️ Backend says video match but missing video data, falling back to live match');
           actualMatchType = responseData.match_type === 'staff' ? 'staff' : 'real_user';
         }
-        // Fallback based on match_type field
-        else {
-          actualMatchType = responseData.match_type || 'unknown';
+
+        // Additional validation for live matches
+        if (actualMatchType !== 'video' && (!responseData.partner || !responseData.partner.id || responseData.partner.id === 'video')) {
+          console.log('⚠️ Backend says live match but missing partner data, falling back to video match');
+          actualMatchType = 'video';
         }
 
         // Handle the match based on its type
@@ -1330,29 +1327,36 @@ Your browser or device does not support camera access.
     if (!this.peerConnection) return;
 
     this.peerConnection.ontrack = (event) => {
-      console.log('🎯 ontrack event received:', event.streams.length, 'streams');
+      console.log('🎯 ONTRACK: Event received:', event.streams.length, 'streams');
 
       if (event.streams && event.streams.length > 0) {
         this.remoteStream = event.streams[0];
-        console.log('✅ Remote stream assigned:', this.remoteStream.getTracks().length, 'tracks');
+        console.log('✅ ONTRACK: Remote stream assigned:', this.remoteStream.getTracks().length, 'tracks');
+
+        // CRITICAL FIX: Update connection state immediately when we get remote stream
+        if (this.onConnectionStateCallback) {
+          this.onConnectionStateCallback('connected' as RTCPeerConnectionState);
+          console.log('✅ ONTRACK: Connection state updated to connected');
+        }
 
         // Single callback - let React handle the timing
         if (this.onRemoteStreamCallback && this.remoteStream) {
           this.onRemoteStreamCallback(this.remoteStream);
-          console.log('✅ Remote stream callback fired');
+          console.log('✅ ONTRACK: Remote stream callback fired');
         } else {
-          console.log('❌ No remote stream callback registered');
+          console.log('❌ ONTRACK: No remote stream callback registered');
         }
 
         // Check remote stream status after setting it
         this.checkRemoteStreamStatus();
       } else {
-        console.log('❌ No streams in ontrack event');
+        console.log('❌ ONTRACK: No streams in ontrack event');
       }
     };
 
     this.peerConnection.onconnectionstatechange = () => {
       const state = this.peerConnection?.connectionState;
+      console.log('🔄 CONNECTION STATE CHANGE:', state);
 
       if (this.onConnectionStateCallback && state) {
         this.onConnectionStateCallback(state);
@@ -1361,6 +1365,18 @@ Your browser or device does not support camera access.
       // Auto-swipe on connection failure or disconnect
       if (state === 'failed' || state === 'disconnected' || state === 'closed') {
         console.log('🔥 Connection failed/closed, handling partner disconnect...');
+        this.handleConnectionFailure();
+      }
+    };
+
+    // Add ice connection state monitoring
+    this.peerConnection.oniceconnectionstatechange = () => {
+      const iceState = this.peerConnection?.iceConnectionState;
+      console.log('🧊 ICE CONNECTION STATE:', iceState);
+
+      // If ICE connection fails, try to recover
+      if (iceState === 'failed') {
+        console.log('🧊 ICE connection failed, attempting recovery...');
         this.handleConnectionFailure();
       }
     };
@@ -1766,23 +1782,26 @@ Your browser or device does not support camera access.
 
   // Handle WebRTC offer
   private async handleOffer(offer: RTCSessionDescriptionInit): Promise<void> {
+    console.log('📨 OFFER: Received offer, processing...');
 
     try {
       // Ensure peer connection exists and is in stable state
       if (!this.peerConnection) {
+        console.log('📨 OFFER: Creating new peer connection...');
         await this.setupPeerConnectionOnly();
       } else {
         // Double-check that the peer connection is truly fresh and ready
         if (this.peerConnection.signalingState !== 'stable' ||
             this.peerConnection.remoteDescription ||
             this.peerConnection.localDescription) {
+          console.log('📨 OFFER: Resetting peer connection due to invalid state');
           this.resetWebRTCState();
 
           // Small delay to ensure cleanup is complete
           await new Promise(resolve => setTimeout(resolve, 100));
 
           // Set up fresh peer connection
-        await this.setupPeerConnectionOnly();
+          await this.setupPeerConnectionOnly();
         }
       }
 
@@ -1791,12 +1810,14 @@ Your browser or device does not support camera access.
 
       // Comprehensive state validation to prevent duplicate offer processing
       if (this.peerConnection!.remoteDescription) {
+        console.log('📨 OFFER: Already have remote description, ignoring duplicate offer');
         return;
       }
 
       // Check if we're in a valid state for receiving an offer
       if (this.peerConnection!.signalingState === 'have-remote-offer' ||
           this.peerConnection!.signalingState === 'have-local-offer') {
+        console.log('📨 OFFER: Already processing offer/answer, ignoring duplicate');
         return;
       }
 
@@ -1804,6 +1825,7 @@ Your browser or device does not support camera access.
       // 'stable' state is valid for receiving offers when the connection is fresh
 
       // Set remote description first
+      console.log('📨 OFFER: Setting remote description...');
       await this.peerConnection!.setRemoteDescription(new RTCSessionDescription(offer));
       this.logWebRTCState();
 
@@ -1812,8 +1834,10 @@ Your browser or device does not support camera access.
 
       // Log current signaling state for debugging
       const currentState = this.peerConnection!.signalingState;
+      console.log('📨 OFFER: Signaling state after setting remote description:', currentState);
 
       // Create and send answer
+      console.log('📨 OFFER: Creating answer...');
       const answer = await this.peerConnection!.createAnswer();
       await this.peerConnection!.setLocalDescription(answer);
       this.logWebRTCState();
@@ -1822,11 +1846,15 @@ Your browser or device does not support camera access.
       this.checkRemoteStreamStatus();
 
       // Send answer to partner
+      console.log('📨 OFFER: Sending answer to partner...');
       this.sendSignal('answer', answer);
 
       // Process any queued ICE candidates
       await this.processQueuedIceCandidates();
+
+      console.log('✅ OFFER: Offer processed successfully');
     } catch (error) {
+      console.log('❌ OFFER: Error processing offer:', error);
 
       // Reset state on critical errors
       if (error instanceof Error && (
@@ -1843,15 +1871,18 @@ Your browser or device does not support camera access.
 
   // Handle WebRTC answer
   private async handleAnswer(answer: RTCSessionDescriptionInit): Promise<void> {
+    console.log('📨 ANSWER: Received answer, processing...');
 
     try {
       // Ensure peer connection exists
       if (!this.peerConnection) {
+        console.log('❌ ANSWER: No peer connection available');
         return;
       }
 
       // Ensure we have a local description before setting remote
       if (!this.peerConnection.localDescription) {
+        console.log('❌ ANSWER: No local description available');
         return;
       }
 
@@ -1860,28 +1891,40 @@ Your browser or device does not support camera access.
 
       // Check if peer connection is in the correct state for receiving an answer
       if (this.peerConnection.signalingState !== 'have-local-offer') {
+        console.log('❌ ANSWER: Wrong signaling state:', this.peerConnection.signalingState);
         // Reset the connection if it's in the wrong state
         this.resetWebRTCState();
         return;
       }
 
       // Set remote description
+      console.log('📨 ANSWER: Setting remote description...');
       await this.peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
       this.logWebRTCState();
 
       // Log current signaling state
       const currentState = this.peerConnection.signalingState;
+      console.log('📨 ANSWER: Signaling state after setting remote description:', currentState);
 
       // Check if connection is stable (using string comparison to avoid TypeScript strictness)
       if (String(currentState) === 'stable') {
+        console.log('✅ ANSWER: Connection is stable, starting heartbeat...');
 
         // Start heartbeat monitoring for connection health
         this.startHeartbeat();
+
+        // CRITICAL FIX: Update connection state to connected
+        if (this.onConnectionStateCallback) {
+          this.onConnectionStateCallback('connected' as RTCPeerConnectionState);
+        }
       }
 
       // Process queued ICE candidates
       await this.processQueuedIceCandidates();
+
+      console.log('✅ ANSWER: Answer processed successfully');
     } catch (error) {
+      console.log('❌ ANSWER: Error processing answer:', error);
 
       // Reset state on critical errors
       if (error instanceof Error && (
@@ -2164,8 +2207,11 @@ Your browser or device does not support camera access.
   private async handleMatchWithErrorHandling(matchType: string, matchData: any): Promise<void> {
 
     try {
+      // CRITICAL FIX: Use actual_match_type from backend for proper detection
+      const actualMatchType = matchData.actual_match_type || matchType;
+
       // Case 1: Video Match - Handle video playback
-      if (matchData.video_id && matchData.video_url) {
+      if (actualMatchType === 'video' && matchData.video_id && matchData.video_url) {
 
         await this.handleVideoMatch({
           videoId: matchData.video_id?.toString() || 'unknown',
@@ -2174,7 +2220,7 @@ Your browser or device does not support camera access.
         });
 
         return; // Explicitly return to prevent any further processing
-      } else if (matchData.partner && matchData.partner.id && matchData.partner.id !== 'video') {
+      } else if (actualMatchType !== 'video' && matchData.partner && matchData.partner.id && matchData.partner.id !== 'video') {
         // Case 2: Live Connection (staff or real user) - Start WebRTC
 
         // CRITICAL: Set match data FIRST before any setup
@@ -2208,11 +2254,19 @@ Your browser or device does not support camera access.
         // Set up peer connection for both initiator and receiver
         await this.setupPeerConnectionOnly();
 
+        // CRITICAL FIX: Update connection state to connecting for both users
+        if (this.onConnectionStateCallback) {
+          this.onConnectionStateCallback('connecting' as RTCPeerConnectionState);
+          console.log('🔄 LIVE MATCH: Connection state set to connecting');
+        }
+
         if (this.isInitiator) {
           // For initiators, start the WebRTC connection (send offer)
+          console.log('🚀 LIVE MATCH: Initiator starting WebRTC connection...');
           await this.startWebRTCConnection();
         } else {
           // For receivers, just wait for the offer
+          console.log('⏳ LIVE MATCH: Receiver waiting for offer...');
         }
       } else {
 
@@ -2917,6 +2971,32 @@ Your browser or device does not support camera access.
 
   // Check remote stream status
   private checkRemoteStreamStatus(): void {
+    if (this.peerConnection) {
+      const connectionState = this.peerConnection.connectionState;
+      const iceConnectionState = this.peerConnection.iceConnectionState;
+      const signalingState = this.peerConnection.signalingState;
+
+      console.log('🔍 STREAM STATUS CHECK:', {
+        connectionState,
+        iceConnectionState,
+        signalingState,
+        hasRemoteStream: !!this.remoteStream,
+        remoteStreamActive: this.remoteStream?.active || false
+      });
+
+      // If we have a stable connection but no remote stream after 5 seconds, something is wrong
+      if (connectionState === 'connected' && iceConnectionState === 'connected' && !this.remoteStream) {
+        console.log('⚠️ STREAM STATUS: Connection stable but no remote stream - possible issue');
+
+        // Give it a bit more time, then check again
+        setTimeout(() => {
+          if (!this.remoteStream && this.peerConnection?.connectionState === 'connected') {
+            console.log('❌ STREAM STATUS: Still no remote stream after delay - triggering fallback');
+            this.handleConnectionFailure();
+          }
+        }, 3000);
+      }
+    }
   }
 
   // Public method to check remote stream status (for debugging)

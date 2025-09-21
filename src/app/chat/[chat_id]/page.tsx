@@ -71,8 +71,9 @@ export default function VideoChatPage() {
     cleanVideoChatService.onRemoteStream((stream) => {
       console.log('📺 UI: Remote stream callback received:', !!stream);
 
-      // Check if we're playing a video first
-      if (isVideoPlaying) {
+      // CRITICAL FIX: Don't ignore remote streams - they might be for live connections
+      // Only ignore if we're currently in a video match state
+      if (isVideoPlaying && currentVideoId) {
         console.log('📺 UI: Ignoring remote stream - video is playing');
         return;
       }
@@ -133,6 +134,12 @@ export default function VideoChatPage() {
       setRemoteStream(null);
       setConnectionState('connecting');
       setMessages([]);
+
+      // CRITICAL FIX: Clear video state as well
+      setIsVideoPlaying(false);
+      setCurrentVideoId(null);
+      setCurrentVideoUrl(null);
+      setCurrentVideoName(null);
 
       const result = await nextSwipe(
         setConnectionState,
@@ -253,12 +260,14 @@ export default function VideoChatPage() {
 
       // Set up video match event listener
       cleanVideoChatService.onVideoMatch((videoData) => {
+        console.log('🎬 UI: Video match received:', videoData);
 
         setConnectionState('connected');
         setError(null);
 
-        // Clear remote stream to prevent conflicts with video playback
+        // CRITICAL FIX: Clear ALL live connection state when video match starts
         setRemoteStream(null);
+        setMessages([]); // Clear any existing messages
 
         setIsVideoPlaying(true);
         setCurrentVideoId(videoData.videoId);
@@ -292,9 +301,11 @@ export default function VideoChatPage() {
       }
 
       cleanVideoChatService.onConnectionStateChange((state) => {
+        console.log('🔄 UI: Connection state changed to:', state);
 
         if (state === 'connected') {
           setConnectionState('connected');
+          console.log('✅ UI: Connection state set to connected');
 
           // For live connections (not video), ensure local stream is available
           if (!isVideoPlaying && !localStream) {
@@ -302,13 +313,18 @@ export default function VideoChatPage() {
               const currentLocalStream = cleanVideoChatService.getCurrentLocalStream();
               if (currentLocalStream) {
                 setLocalStream(currentLocalStream);
+                console.log('✅ UI: Local stream set');
               }
             } catch (error) {
-
+              console.log('❌ UI: Error getting local stream:', error);
             }
           }
         } else if (state === 'failed' || state === 'disconnected') {
           setConnectionState('failed');
+          console.log('❌ UI: Connection state set to failed');
+        } else if (state === 'connecting') {
+          setConnectionState('connecting');
+          console.log('🔄 UI: Connection state set to connecting');
         }
       });
 
