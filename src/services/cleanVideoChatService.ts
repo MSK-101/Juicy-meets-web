@@ -2129,14 +2129,11 @@ Your browser or device does not support camera access.
   private async setupPeerConnectionOnly(): Promise<void> {
 
     try {
-      // Create peer connection with proper STUN servers
+      // Create peer connection with optimized STUN servers (max 2 for performance)
       this.peerConnection = new RTCPeerConnection({
         iceServers: [
           { urls: 'stun:stun.l.google.com:19302' },
-          { urls: 'stun:stun1.l.google.com:19302' },
-          { urls: 'stun:stun2.l.google.com:19302' },
-          { urls: 'stun:stun3.l.google.com:19302' },
-          { urls: 'stun:stun4.l.google.com:19302' }
+          { urls: 'stun:stun1.l.google.com:19302' }
         ]
       });
 
