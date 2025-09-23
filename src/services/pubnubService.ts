@@ -46,7 +46,7 @@ class PubNubService {
       });
 
     } catch (error) {
-      
+
     }
   }
 
@@ -111,7 +111,7 @@ class PubNubService {
 
           handlers.onMessage(msg);
         } catch (e) {
-          
+
           handlers.onError?.(e);
         }
       },
@@ -158,9 +158,9 @@ class PubNubService {
     if (this.client) {
       try {
         this.client.unsubscribeAll();
-        
+
       } catch (error) {
-        
+
       }
     }
 
@@ -309,7 +309,7 @@ class PubNubService {
       // Allow joining different rooms - only block if trying to join the exact same room and session
       return this.client !== null && this.channel !== undefined;
     } catch (error) {
-      
+
       return false;
     }
   }
@@ -322,6 +322,7 @@ class PubNubService {
       sessionVersion: this.sessionVersion
     };
   }
+
 }
 
 export const pubnubService = new PubNubService();
