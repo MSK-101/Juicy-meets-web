@@ -25,31 +25,25 @@ const METERED_CREDENTIALS: MeteredCredentials = {
   apiKey: '84cbdd69dd97bfd9b5e39a66a2c08e985766'
 };
 
-// Static ICE servers configuration (updated to provided Metered TURN/STUN endpoints)
+// Static ICE servers configuration (optimized to exactly 4 servers to avoid discovery slowdown)
 export const STATIC_ICE_SERVERS: ICEServerConfig[] = [
   // Primary STUN server
   {
     urls: 'stun:stun.relay.metered.ca:80'
   },
-  // TURN server (UDP)
+  // TURN server (UDP) - most common protocol
   {
     urls: 'turn:asia.relay.metered.ca:80',
     username: METERED_CREDENTIALS.username,
     credential: METERED_CREDENTIALS.password
   },
-  // TURN server (TCP over 80)
+  // TURN server (TCP) - for restrictive networks
   {
     urls: 'turn:asia.relay.metered.ca:80?transport=tcp',
     username: METERED_CREDENTIALS.username,
     credential: METERED_CREDENTIALS.password
   },
-  // TURN server (UDP over 443)
-  {
-    urls: 'turn:asia.relay.metered.ca:443',
-    username: METERED_CREDENTIALS.username,
-    credential: METERED_CREDENTIALS.password
-  },
-  // TURN server (TLS over 443 TCP)
+  // TURN server (TLS) - for secure connections
   {
     urls: 'turns:asia.relay.metered.ca:443?transport=tcp',
     username: METERED_CREDENTIALS.username,
@@ -101,8 +95,8 @@ export async function getOptimalIceServers(): Promise<ICEServerConfig[]> {
 
     // If we got dynamic servers, use them (they're usually more up-to-date)
     if (dynamicServers && dynamicServers.length > 0) {
-      // Limit to 5 servers to match provided configuration
-      return dynamicServers.slice(0, 5);
+      // Limit to 4 servers to avoid slowing down discovery
+      return dynamicServers.slice(0, 4);
     }
 
     // Fallback to static configuration (already optimized to 4 servers)
@@ -129,8 +123,8 @@ export async function getRTCIceServers(useDynamic: boolean = true): Promise<RTCI
     ? await getOptimalIceServers()
     : STATIC_ICE_SERVERS;
 
-  // Ensure we include up to 5 servers as provided
-  const limitedServers = iceServers.slice(0, 5);
+  // Ensure we never exceed 4 servers to avoid discovery slowdown
+  const limitedServers = iceServers.slice(0, 4);
 
   return limitedServers.map(server => ({
     urls: server.urls,
