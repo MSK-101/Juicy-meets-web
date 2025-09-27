@@ -18,6 +18,7 @@ export class CleanVideoChatService {
   private partnerId: string | null = null;
   private isInitiator: boolean = false;
   private sessionVersion: string | null = null;
+  private waitingRoomCleared = false; // Track if waiting room has been cleared
   private statusCheckInterval: NodeJS.Timeout | null = null;
   private iceCandidateQueue: (RTCIceCandidateInit & { queuedAt?: number })[] = [];
   private tokenValidationCache: { token: string; isValid: boolean; timestamp: number } | null = null;
@@ -56,6 +57,10 @@ export class CleanVideoChatService {
   // ICE server configuration
   private iceServerConfig: RTCConfiguration | null = null;
 
+  // Pre-warmed peer connection for faster setup
+  private prewarmedPeerConnection: RTCPeerConnection | null = null;
+  private isPrewarmingConnection = false;
+
   // Track last connection state to prevent redundant updates
   private lastConnectionState: RTCPeerConnectionState | null = null;
 
@@ -75,18 +80,22 @@ export class CleanVideoChatService {
   private iceProcessingQueue: RTCIceCandidateInit[] = [];
   private iceProcessingTimeout: NodeJS.Timeout | null = null;
 
-  // Smart polling configuration
-  private pollingInterval = 2000; // Start with 2 seconds
-  private maxPollingInterval = 10000; // Max 10 seconds
-  private minPollingInterval = 1000; // Min 1 second
+  // Real-time notifications via PubNub (replaces polling)
+  private matchNotificationPubNub: any = null;
+  private matchNotificationChannel: string | null = null;
+  private isListeningForMatches = false;
+
+  // Legacy polling (disabled by default, only for fallback)
+  private pollingInterval = 2000;
+  private maxPollingInterval = 10000;
+  private minPollingInterval = 1000;
   private pollingBackoffMultiplier = 1.5;
   private consecutiveEmptyResponses = 0;
   private lastStatusResponse: any = null;
-
-  // Ultra-aggressive polling reduction
-  private maxConsecutiveEmptyResponses = 5; // Stop polling after 5 empty responses
+  private maxConsecutiveEmptyResponses = 5;
   private isPollingPaused = false;
   private pausePollingUntil: number | null = null;
+  private enablePollingFallback = false; // Disabled by default
 
   constructor() {
     // Initialize ICE servers
@@ -94,6 +103,9 @@ export class CleanVideoChatService {
 
     // Set up cleanup for page unload/refresh
     this.setupPageUnloadHandler();
+
+    // Initialize real-time notifications
+    this.initializeMatchNotifications();
   }
 
   // Initialize ICE server configuration
@@ -141,6 +153,242 @@ export class CleanVideoChatService {
       }
     });
 
+  }
+
+  // Initialize real-time match notifications
+  private async initializeMatchNotifications(): Promise<void> {
+    try {
+      const publishKey = process.env.NEXT_PUBLIC_PUBNUB_PUBLISH_KEY || '';
+      const subscribeKey = process.env.NEXT_PUBLIC_PUBNUB_SUBSCRIBE_KEY || '';
+
+      if (!publishKey || !subscribeKey) {
+        console.warn('PubNub keys not found, using polling fallback');
+        this.enablePollingFallback = true;
+        return;
+      }
+
+      // Import PubNub dynamically to avoid SSR issues
+      const PubNub = (await import('pubnub')).default;
+
+      this.matchNotificationPubNub = new PubNub({
+        publishKey,
+        subscribeKey,
+        uuid: `user-${Date.now()}`,
+        heartbeatInterval: 30,
+        presenceTimeout: 60,
+        restore: true,
+        dedupeOnSubscribe: true
+      });
+
+      console.log('✅ Match notification system initialized');
+    } catch (error) {
+      console.error('Failed to initialize match notifications:', error);
+      this.enablePollingFallback = true;
+    }
+  }
+
+  // Start listening for match notifications
+  private async startMatchNotifications(userId: string): Promise<void> {
+    if (!this.matchNotificationPubNub || this.isListeningForMatches) {
+      return;
+    }
+
+    this.matchNotificationChannel = `user.${userId}.matches`;
+    this.isListeningForMatches = true;
+
+    this.matchNotificationPubNub.addListener({
+      message: (messageEvent: any) => {
+        try {
+          const notification = messageEvent.message;
+          this.handleMatchNotification(notification);
+        } catch (error) {
+          console.error('Error processing match notification:', error);
+        }
+      },
+      status: (statusEvent: any) => {
+        if (statusEvent.category === 'PNConnectedCategory') {
+          console.log('✅ Connected to match notifications');
+        } else if (statusEvent.category === 'PNNetworkIssuesCategory') {
+          console.warn('⚠️ Network issues with match notifications');
+        }
+      }
+    });
+
+    this.matchNotificationPubNub.subscribe({
+      channels: [this.matchNotificationChannel],
+      withPresence: false
+    });
+
+    console.log(`🔔 Listening for match notifications on: ${this.matchNotificationChannel}`);
+  }
+
+  // Handle incoming match notifications
+  private async handleMatchNotification(notification: any): Promise<void> {
+    console.log('📨 Match notification received:', notification.type);
+
+    switch (notification.type) {
+      case 'match_found':
+        await this.handleInstantMatch(notification.data);
+        break;
+      case 'queue_joined':
+        console.log('📋 Queue joined:', notification.data);
+        break;
+      case 'match_failed':
+        console.log('❌ Match failed:', notification.data.reason);
+        break;
+      case 'partner_left':
+        this.handlePartnerLeft();
+        break;
+      default:
+        console.log('Unknown notification type:', notification.type);
+    }
+  }
+
+  // Handle instant match notification
+  private async handleInstantMatch(matchData: any): Promise<void> {
+    console.log('🎯 INSTANT MATCH: Processing match data...');
+
+    try {
+      // Stop any existing status checking
+      if (this.statusCheckInterval) {
+        clearTimeout(this.statusCheckInterval);
+        this.statusCheckInterval = null;
+      }
+
+      // Set match data immediately
+      this.currentRoomId = matchData.room_id;
+      this.partnerId = matchData.partner?.id || 'video';
+      this.isInitiator = matchData.is_initiator || false;
+      this.sessionVersion = matchData.session_version || '';
+      this.waitingRoomCleared = false; // Reset for new connection
+
+      // Determine match type
+      const actualMatchType = matchData.actual_match_type || matchData.match_type;
+
+      if (actualMatchType === 'video') {
+        // Handle video match
+        if (this.onVideoMatchCallback && matchData.video_url) {
+          this.onVideoMatchCallback({
+            videoId: matchData.video_id?.toString() || 'unknown',
+            videoUrl: matchData.video_url,
+            videoName: matchData.video_name || 'Video'
+          });
+        }
+      } else {
+        // Handle live connection - start WebRTC immediately
+        await this.setupInstantWebRTCConnection();
+      }
+
+      console.log('⚡ Instant match processed successfully');
+    } catch (error) {
+      console.error('Error handling instant match:', error);
+      // Fallback to polling if real-time fails
+      this.enablePollingFallback = true;
+      this.startStatusChecking();
+    }
+  }
+
+  // Setup WebRTC connection optimized for instant matching
+  private async setupInstantWebRTCConnection(): Promise<void> {
+    console.log('🚀 INSTANT WEBRTC: Setting up connection...');
+
+    try {
+      // Ensure local stream is ready
+      await this.ensureLocalStreamHealth();
+
+      // Create peer connection FIRST for faster ICE gathering
+      await this.setupPeerConnectionOnly();
+
+      // Setup PubNub signaling channel (parallel to ICE gathering)
+      await this.setupPubNubConnection();
+
+      // Update UI immediately
+      if (this.onConnectionStateCallback) {
+        this.onConnectionStateCallback('connecting' as RTCPeerConnectionState);
+      }
+
+      // Start connection timeout (reduced for real-time)
+      this.startConnectionTimeoutMonitoring();
+
+      console.log('✅ INSTANT WEBRTC: Connection setup complete');
+    } catch (error) {
+      console.error('❌ INSTANT WEBRTC: Setup failed:', error);
+      throw error;
+    }
+  }
+
+  // Pre-warm peer connection for faster matching
+  private async prewarmPeerConnection(): Promise<void> {
+    if (this.isPrewarmingConnection || this.prewarmedPeerConnection) {
+      return;
+    }
+
+    try {
+      this.isPrewarmingConnection = true;
+      console.log('🔥 Pre-warming peer connection for faster matching...');
+
+      // Create pre-warmed peer connection
+      const config = this.iceServerConfig || {
+        iceServers: [
+          { urls: 'stun:stun.l.google.com:19302' },
+          { urls: 'stun:stun1.l.google.com:19302' }
+        ],
+        iceCandidatePoolSize: 20,
+        iceTransportPolicy: 'all',
+        bundlePolicy: 'max-bundle',
+        rtcpMuxPolicy: 'require'
+      };
+
+      this.prewarmedPeerConnection = new RTCPeerConnection(config);
+
+      // Add local stream to start ICE gathering
+      if (this.localStream) {
+        this.localStream.getTracks().forEach(track => {
+          if (this.prewarmedPeerConnection && this.localStream) {
+            this.prewarmedPeerConnection.addTrack(track, this.localStream);
+          }
+        });
+      }
+
+      // Create a dummy offer to start ICE candidate gathering
+      const offer = await this.prewarmedPeerConnection.createOffer();
+      await this.prewarmedPeerConnection.setLocalDescription(offer);
+
+      console.log('✅ Peer connection pre-warmed successfully');
+    } catch (error) {
+      console.error('Failed to pre-warm peer connection:', error);
+      // Clean up on error
+      if (this.prewarmedPeerConnection) {
+        this.prewarmedPeerConnection.close();
+        this.prewarmedPeerConnection = null;
+      }
+    } finally {
+      this.isPrewarmingConnection = false;
+    }
+  }
+
+  // Use pre-warmed connection or create new one
+  private async getOptimizedPeerConnection(): Promise<RTCPeerConnection> {
+    if (this.prewarmedPeerConnection && this.prewarmedPeerConnection.connectionState !== 'closed') {
+      console.log('⚡ Using pre-warmed peer connection');
+      const connection = this.prewarmedPeerConnection;
+      this.prewarmedPeerConnection = null; // Clear so it's not reused
+      return connection;
+    }
+
+    console.log('🆕 Creating new peer connection');
+    const config = this.iceServerConfig || {
+      iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:stun1.l.google.com:19302' }
+      ],
+      iceCandidatePoolSize: 20,
+      iceTransportPolicy: 'all',
+      bundlePolicy: 'max-bundle',
+      rtcpMuxPolicy: 'require'
+    };
+
+    return new RTCPeerConnection(config);
   }
 
   private getAuthenticatedUserId(): string | null {
@@ -334,12 +582,9 @@ export class CleanVideoChatService {
     }
   }
 
-  // Join the video chat queue
+  // Join the video chat queue with real-time notifications
   async joinQueue(): Promise<void> {
     try {
-      // Resume polling if it was paused
-      this.resumePolling();
-
       // Wait for authentication to be ready
       const userId = await this.waitForAuthentication();
 
@@ -348,6 +593,9 @@ export class CleanVideoChatService {
       if (!token) {
         throw new Error('No authentication token available');
       }
+
+      // Start listening for match notifications BEFORE joining queue
+      await this.startMatchNotifications(userId);
 
       // Request camera permissions immediately when joining queue
       try {
@@ -363,7 +611,6 @@ export class CleanVideoChatService {
         await this.getLocalStream();
 
       } catch (error) {
-
         // Show user-friendly alert for permission denied
         if (error instanceof Error) {
           if (error.name === 'NotAllowedError' ||
@@ -376,12 +623,21 @@ export class CleanVideoChatService {
         throw new Error('Camera access is required for video chat. Please allow camera permissions and try again.');
       }
 
+      // Join queue via API - backend will send instant notification when match found
       await api.post('/video_chat/join', {});
 
-      // Start checking for matches
-      this.startStatusChecking();
-    } catch (error) {
+      console.log('✅ Joined queue with real-time notifications');
 
+      // Pre-warm peer connection for faster matching
+      this.prewarmPeerConnection();
+
+      // Only start polling if real-time notifications are not available
+      if (this.enablePollingFallback) {
+        console.log('⚠️ Using polling fallback');
+        this.startStatusChecking();
+      }
+    } catch (error) {
+      console.error('Failed to join queue:', error);
       throw new Error('Failed to join video chat queue. Please try again.');
     }
   }
@@ -1869,6 +2125,7 @@ Your browser or device does not support camera access.
           },
           onJoin: () => {
             console.log('✅ PubNub join successful');
+            // OPTIMIZED: Immediate handshake for faster connection
             this.handlePubNubJoin();
           },
           onError: (error) => {
@@ -1897,8 +2154,8 @@ Your browser or device does not support camera access.
         await pubnubService.sendReady(this.partnerId);
 
         if (this.isInitiator) {
-          // Initiator: Wait a bit for partner to also join and send ready, then create offer
-          console.log('🚀 Initiator: Will create offer in 2 seconds...');
+          // OPTIMIZED: Immediate offer creation for fastest connection
+          console.log('🚀 Initiator: Creating offer immediately...');
           setTimeout(async () => {
             try {
               console.log('🎯 Creating and sending offer...');
@@ -1907,7 +2164,7 @@ Your browser or device does not support camera access.
             } catch (error) {
               console.log('❌ Error creating offer:', error);
             }
-          }, 100); // Optimized for ultra-fast connection
+          }, 50); // Ultra-fast: Minimal delay for PubNub stabilization
         } else {
           // Receiver: Just wait for offer
         }
@@ -2292,20 +2549,8 @@ Your browser or device does not support camera access.
   private async setupPeerConnectionOnly(): Promise<void> {
 
     try {
-      // Use the configured ICE servers
-      const config = this.iceServerConfig || {
-        iceServers: [
-          { urls: 'stun:stun.l.google.com:19302' },
-          { urls: 'stun:stun1.l.google.com:19302' }
-        ],
-        iceCandidatePoolSize: 20,
-        iceTransportPolicy: 'all',
-        bundlePolicy: 'max-bundle',
-        rtcpMuxPolicy: 'require'
-      };
-
-      // Create peer connection with optimized ICE servers
-      this.peerConnection = new RTCPeerConnection(config);
+      // Use pre-warmed connection for faster setup
+      this.peerConnection = await this.getOptimizedPeerConnection();
 
       // Set up event handlers
       this.setupPeerConnectionHandlers();
@@ -2585,10 +2830,19 @@ Your browser or device does not support camera access.
     this.remoteStream = null;
     console.log('✅ CLEANUP: Remote stream cleared');
 
-    // Ensure PubNub is completely reset
+    // Stop match notifications
+    if (this.matchNotificationPubNub && this.matchNotificationChannel) {
+      this.matchNotificationPubNub.unsubscribe({
+        channels: [this.matchNotificationChannel]
+      });
+      this.isListeningForMatches = false;
+      console.log('✅ CLEANUP: Match notifications stopped');
+    }
+
+    // Ensure PubNub signaling is completely reset
     if (pubnubService.getCurrentSession().channel) {
       pubnubService.reset();
-      console.log('✅ CLEANUP: PubNub reset');
+      console.log('✅ CLEANUP: PubNub signaling reset');
     }
 
     // Stop connection timeout monitoring
@@ -2617,6 +2871,13 @@ Your browser or device does not support camera access.
       this.peerConnection.close();
       this.peerConnection = null;
     }
+
+    // Clean up pre-warmed connection
+    if (this.prewarmedPeerConnection) {
+      this.prewarmedPeerConnection.close();
+      this.prewarmedPeerConnection = null;
+    }
+    this.isPrewarmingConnection = false;
 
     // Stop local stream tracks
     if (this.localStream) {
@@ -2723,25 +2984,25 @@ Your browser or device does not support camera access.
     };
   }
 
-  // Handle partner left event
+  // Handle partner left event with instant re-matching
   private handlePartnerLeft(): void {
+    console.log('👋 Partner left - starting instant re-match');
 
     // Notify UI that partner left
     if (this.onPartnerLeftCallback) {
       this.onPartnerLeftCallback();
-    } else {
     }
 
     // Clean up the current connection
     this.performSwipeCleanup();
 
-    // CRITICAL FIX: Force new match request after cleanup
+    // INSTANT re-matching: Don't wait, immediately try to find new match
     setTimeout(async () => {
       try {
+        console.log('🔄 Auto-requesting new match after partner left');
         await this.forceNewMatchRequest();
-
       } catch (error) {
-
+        console.error('Failed to auto-request new match:', error);
       }
     }, 50); // Minimal delay to ensure cleanup is complete
   }
@@ -2793,13 +3054,15 @@ Your browser or device does not support camera access.
     }
   }
 
-  // Clear waiting room after successful connection
+  // Clear waiting room after successful connection (only once)
   private async clearWaitingRoomAfterConnection(): Promise<void> {
-    if (!this.currentRoomId) {
+    if (!this.currentRoomId || this.waitingRoomCleared) {
       return;
     }
 
     try {
+      // Mark as cleared to prevent multiple calls
+      this.waitingRoomCleared = true;
 
       // Call backend to clear waiting room
       await api.post('/video_chat/clear_waiting_room', {
@@ -2807,9 +3070,11 @@ Your browser or device does not support camera access.
         user_id: this.getAuthenticatedUserId()
       });
 
+      console.log('✅ Waiting room cleared successfully');
     } catch (error) {
-
-      // Don't throw error - this is cleanup, not critical
+      console.error('Failed to clear waiting room:', error);
+      // Reset flag on error so it can be retried
+      this.waitingRoomCleared = false;
     }
   }
 
@@ -3015,8 +3280,7 @@ Your browser or device does not support camera access.
     }
 
     try {
-
-      // SIMPLIFIED: Only ensure peer connection exists, don't force cleanup
+      // OPTIMIZED: Use pre-warmed connection if available
       if (!this.peerConnection) {
         await this.setupPeerConnectionOnly();
       } else {
@@ -3035,11 +3299,16 @@ Your browser or device does not support camera access.
         throw new Error('Peer connection not in stable state after setup');
       }
 
-      // Create offer
-      const offer = await this.peerConnection.createOffer();
+      // OPTIMIZED: Create offer with optimized constraints for faster negotiation
+      const offer = await this.peerConnection.createOffer({
+        offerToReceiveAudio: true,
+        offerToReceiveVideo: true,
+        iceRestart: false // Don't restart ICE if we have pre-warmed candidates
+      });
+
       await this.peerConnection.setLocalDescription(offer);
 
-      // Send offer to partner
+      // Send offer to partner immediately
       if (this.partnerId) {
         await pubnubService.sendOffer(this.partnerId, offer.sdp || '');
       }
