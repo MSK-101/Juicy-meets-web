@@ -176,8 +176,7 @@ export class CleanVideoChatService {
         uuid: `user-${Date.now()}`,
         heartbeatInterval: 30,
         presenceTimeout: 60,
-        restore: true,
-        dedupeOnSubscribe: true
+        restore: true
       });
 
       console.log('✅ Match notification system initialized');
