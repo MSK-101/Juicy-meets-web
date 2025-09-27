@@ -25,27 +25,33 @@ const METERED_CREDENTIALS: MeteredCredentials = {
   apiKey: '84cbdd69dd97bfd9b5e39a66a2c08e985766'
 };
 
-// Static ICE servers configuration (optimized to exactly 4 servers to avoid discovery slowdown)
+// Static ICE servers configuration (optimized for Indian region with 5 servers)
 export const STATIC_ICE_SERVERS: ICEServerConfig[] = [
   // Primary STUN server
   {
     urls: 'stun:stun.relay.metered.ca:80'
   },
-  // TURN server (UDP) - most common protocol
+  // TURN server (UDP) - most common protocol for Indian region
   {
-    urls: 'turn:asia.relay.metered.ca:80',
+    urls: 'turn:in.relay.metered.ca:80',
     username: METERED_CREDENTIALS.username,
     credential: METERED_CREDENTIALS.password
   },
-  // TURN server (TCP) - for restrictive networks
+  // TURN server (TCP) - for restrictive networks in India
   {
-    urls: 'turn:asia.relay.metered.ca:80?transport=tcp',
+    urls: 'turn:in.relay.metered.ca:80?transport=tcp',
     username: METERED_CREDENTIALS.username,
     credential: METERED_CREDENTIALS.password
   },
-  // TURN server (TLS) - for secure connections
+  // TURN server (TLS) - for secure connections in India
   {
-    urls: 'turns:asia.relay.metered.ca:443?transport=tcp',
+    urls: 'turn:in.relay.metered.ca:443',
+    username: METERED_CREDENTIALS.username,
+    credential: METERED_CREDENTIALS.password
+  },
+  // TURN server (TLS over TCP) - additional secure option for India
+  {
+    urls: 'turns:in.relay.metered.ca:443?transport=tcp',
     username: METERED_CREDENTIALS.username,
     credential: METERED_CREDENTIALS.password
   }
@@ -86,7 +92,7 @@ export async function fetchDynamicIceServers(): Promise<ICEServerConfig[]> {
 /**
  * Gets the optimal ICE server configuration
  * Uses dynamic credentials if available, falls back to static configuration
- * @returns Promise<ICEServerConfig[]> - Optimized ICE server configuration (max 4 servers)
+ * @returns Promise<ICEServerConfig[]> - Optimized ICE server configuration (max 5 servers)
  */
 export async function getOptimalIceServers(): Promise<ICEServerConfig[]> {
   try {
@@ -95,19 +101,20 @@ export async function getOptimalIceServers(): Promise<ICEServerConfig[]> {
 
     // If we got dynamic servers, use them (they're usually more up-to-date)
     if (dynamicServers && dynamicServers.length > 0) {
-      // Limit to 4 servers to avoid slowing down discovery
-      return dynamicServers.slice(0, 4);
+      // Limit to 5 servers to avoid slowing down discovery
+      return dynamicServers.slice(0, 5);
     }
 
-    // Fallback to static configuration (already optimized to 4 servers)
+    // Fallback to static configuration (optimized for Indian region with 5 servers)
     return STATIC_ICE_SERVERS;
   } catch (error) {
     console.warn('Using fallback ICE servers due to error:', error);
     // Use only the most essential servers to stay under 5 limit
     return [
       STATIC_ICE_SERVERS[0], // Primary STUN
-      STATIC_ICE_SERVERS[1], // Primary TURN UDP
-      STATIC_ICE_SERVERS[2], // TURN TCP
+      STATIC_ICE_SERVERS[1], // Primary TURN UDP (India)
+      STATIC_ICE_SERVERS[2], // TURN TCP (India)
+      STATIC_ICE_SERVERS[3], // TURN TLS (India)
       FALLBACK_ICE_SERVERS[0] // Google STUN as backup
     ];
   }
@@ -116,15 +123,15 @@ export async function getOptimalIceServers(): Promise<ICEServerConfig[]> {
 /**
  * Gets ICE servers for RTCPeerConnection configuration
  * @param useDynamic - Whether to try fetching dynamic credentials first
- * @returns Promise<RTCIceServer[]> - ICE servers ready for RTCPeerConnection (max 4 servers)
+ * @returns Promise<RTCIceServer[]> - ICE servers ready for RTCPeerConnection (max 5 servers)
  */
 export async function getRTCIceServers(useDynamic: boolean = true): Promise<RTCIceServer[]> {
   const iceServers = useDynamic
     ? await getOptimalIceServers()
     : STATIC_ICE_SERVERS;
 
-  // Ensure we never exceed 4 servers to avoid discovery slowdown
-  const limitedServers = iceServers.slice(0, 4);
+  // Ensure we never exceed 5 servers to avoid discovery slowdown
+  const limitedServers = iceServers.slice(0, 5);
 
   return limitedServers.map(server => ({
     urls: server.urls,
