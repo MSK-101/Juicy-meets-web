@@ -2,12 +2,12 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { useVideos, useVideoFilters } from "@/api/hooks/useVideosQueries";
+import { useVideos, useVideoFilters, useDeleteVideo } from "@/api/hooks/useVideosQueries";
 import { usePools } from "@/api/hooks/usePoolsQueries";
 import DataTable from "@/components/admin/DataTable";
 import Pagination from "@/components/Pagination";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faSearch, faEdit } from "@fortawesome/free-solid-svg-icons";
+import { faSearch, faEdit, faTrash } from "@fortawesome/free-solid-svg-icons";
 
 export default function Videos() {
   const router = useRouter();
@@ -16,12 +16,13 @@ export default function Videos() {
   const [genderFilter, setGenderFilter] = useState<string>("");
   const [statusFilter, setStatusFilter] = useState<string>("");
   const [currentPage, setCurrentPage] = useState(1);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   // Fetch data
   const { data: videosData, isLoading: videosLoading, error: videosError } = useVideos({
     page: currentPage,
     per_page: 10,
-                 pool_id: poolFilter || undefined,
+    pool_id: poolFilter || undefined,
     gender: genderFilter || undefined,
     status: statusFilter || undefined,
     search: searchQuery || undefined,
@@ -29,10 +30,28 @@ export default function Videos() {
 
   const { data: filtersData, isLoading: filtersLoading } = useVideoFilters();
   const { data: poolsData, isLoading: poolsLoading } = usePools();
+  const deleteVideoMutation = useDeleteVideo();
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     setCurrentPage(1);
+  };
+
+  const handleDeleteVideo = async (videoId: number, videoName: string) => {
+    if (!confirm(`Are you sure you want to delete "${videoName}"? This action cannot be undone.`)) {
+      return;
+    }
+
+    setDeleteError(null);
+    try {
+      await deleteVideoMutation.mutateAsync(videoId);
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        setDeleteError(error.message);
+      } else {
+        setDeleteError("Failed to delete video");
+      }
+    }
   };
 
   const columns = [
@@ -86,14 +105,25 @@ export default function Videos() {
       label: "Actions",
       render: (value: unknown, row: Record<string, unknown>) => {
         const videoId = row.id as number;
+        const videoName = row.name as string;
         return (
-          <button
-            onClick={() => router.push(`/admin/videos/edit/${videoId}`)}
-            className="inline-flex items-center px-2 py-1 text-sm text-purple-600 hover:text-purple-700 hover:bg-purple-50 rounded transition-colors"
-          >
-            <FontAwesomeIcon icon={faEdit} className="w-4 h-4 mr-1" />
-            Edit
-          </button>
+          <div className="flex space-x-2">
+            <button
+              onClick={() => router.push(`/admin/videos/edit/${videoId}`)}
+              className="inline-flex items-center px-2 py-1 text-sm text-purple-600 hover:text-purple-700 hover:bg-purple-50 rounded transition-colors"
+            >
+              <FontAwesomeIcon icon={faEdit} className="w-4 h-4 mr-1" />
+              Edit
+            </button>
+            <button
+              onClick={() => handleDeleteVideo(videoId, videoName)}
+              disabled={deleteVideoMutation.isPending}
+              className="inline-flex items-center px-2 py-1 text-sm text-red-600 hover:text-red-700 hover:bg-red-50 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <FontAwesomeIcon icon={faTrash} className="w-4 h-4 mr-1" />
+              Delete
+            </button>
+          </div>
         );
       }
     },
@@ -124,6 +154,13 @@ export default function Videos() {
 
   return (
     <div className="space-y-6 min-h-full">
+      {/* Error Message */}
+      {deleteError && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+          <p className="text-red-600 font-poppins">{deleteError}</p>
+        </div>
+      )}
+
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <h1 className="text-2xl font-bold text-gray-900">Videos</h1>
         <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-4 w-full sm:w-auto">
