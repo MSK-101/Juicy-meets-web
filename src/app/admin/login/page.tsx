@@ -39,13 +39,15 @@ export default function AdminLogin() {
     e.preventDefault();
     setError("");
 
-    try {
-      await login(credentials);
-      router.push("/admin/dashboard");
-    } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : "Invalid credentials. Please try again.";
-      setError(errorMessage);
-    }
+    login(credentials, {
+      onSuccess: () => {
+        router.push("/admin/dashboard");
+      },
+      onError: (error: unknown) => {
+        const errorMessage = error instanceof Error ? error.message : "Invalid credentials. Please try again.";
+        setError(errorMessage);
+      }
+    });
   };
 
   return (
