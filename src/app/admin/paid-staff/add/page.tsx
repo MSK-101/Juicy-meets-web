@@ -93,9 +93,14 @@ export default function AddStaff() {
       } else {
         setError("Failed to create staff member");
       }
-    } catch (error) {
-      
-      setError(error instanceof Error ? error.message : "Failed to create staff member");
+    } catch (error: unknown) {
+
+      // Handle API error response
+      if (error instanceof Error) {
+        setError(error.message);
+      } else {
+        setError("Failed to create staff member");
+      }
     } finally {
       setSaving(false);
     }

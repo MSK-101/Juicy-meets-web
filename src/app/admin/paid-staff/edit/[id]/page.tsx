@@ -52,8 +52,8 @@ export default function EditStaff() {
       const staffData = await staffService.getStaffMember(staffId);
       setFormData(staffData);
     } catch (error) {
-      
-      setError("Failed to fetch staff data. Please try again.");
+
+      setError(error instanceof Error ? error.message : "Failed to fetch staff data. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -104,9 +104,14 @@ export default function EditStaff() {
       } else {
         setError("Failed to update staff member");
       }
-    } catch (error) {
-      
-      setError(error instanceof Error ? error.message : "Failed to update staff member");
+    } catch (error: unknown) {
+
+      // Handle API error response
+      if (error instanceof Error) {
+        setError(error.message);
+      } else {
+        setError("Failed to update staff member");
+      }
     } finally {
       setSaving(false);
     }
