@@ -35,9 +35,7 @@ class CoinDeductionService {
     try {
       const response = await api.get('/video_chat/deduction_rules') as { rules: DeductionRule[] };
       this.activeRules = response.rules || [];
-      
     } catch (error) {
-      
       this.activeRules = [];
     }
   }
@@ -56,7 +54,6 @@ class CoinDeductionService {
       this.durationCheckInterval = setInterval(() => {
         this.checkAndApplyDeductions();
       }, 1000);
-    } else {
     }
   }
 
@@ -80,7 +77,6 @@ class CoinDeductionService {
     // Check each rule to see if we've reached the threshold
     for (const rule of this.activeRules) {
       if (currentDuration === rule.threshold_seconds && !this.appliedThresholds.has(rule.threshold_seconds)) {
-
         try {
           const result = await this.applyDurationDeduction(currentDuration);
 
@@ -101,7 +97,6 @@ class CoinDeductionService {
             this.emitDeductionError(result);
           }
         } catch (error) {
-          
           // Emit error event for UI feedback
           this.emitDeductionError({
             success: false,
@@ -125,7 +120,7 @@ class CoinDeductionService {
 
       return response;
     } catch (error) {
-      
+
       throw error;
     }
   }
@@ -136,7 +131,7 @@ class CoinDeductionService {
       const response = await api.get('/video_chat/user_balance') as { balance: number };
       return response.balance;
     } catch (error) {
-      
+
       return 0;
     }
   }
@@ -152,7 +147,7 @@ class CoinDeductionService {
       } else {
       }
     } catch (error) {
-      
+
       this.isBalanceZero = true; // Fail-safe: assume no balance
     }
   }

@@ -53,6 +53,10 @@ interface UserState {
   incrementLocalVideoCount: () => void;
   isStaffUser: () => boolean;
   shouldSyncWithBackend: () => boolean;
+
+  // Ban handling
+  handleUserBan: () => void;
+
 }
 
 export const useAuthStore = create<UserState>()(
@@ -80,9 +84,9 @@ export const useAuthStore = create<UserState>()(
           localStorage.removeItem('juicyMeetsUser');
           localStorage.removeItem('juicyMeetsAuthToken');
           localStorage.removeItem('juicyMeetsUserDetails');
-          
+
         } catch (error) {
-          
+
         }
       },
 
@@ -158,6 +162,17 @@ export const useAuthStore = create<UserState>()(
         // Staff users always sync with backend, app users sync after successful matches
         return user?.role === 'staff';
       },
+
+      // Handle user ban - same as logout
+      handleUserBan: () => {
+        console.log('🚫 User has been banned - performing logout');
+        get().clearUser();
+        alert('Your account has been suspended due to multiple reports. You have been logged out.');
+        if (typeof window !== 'undefined') {
+          window.location.href = '/';
+        }
+      },
+
     }),
     {
       name: "juicy-meets-auth-storage",

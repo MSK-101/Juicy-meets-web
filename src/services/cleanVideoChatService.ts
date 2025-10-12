@@ -3428,6 +3428,19 @@ Your browser or device does not support camera access.
       signalingState: this.peerConnection?.signalingState
     };
   }
+
+  // Getter methods for external access
+  public getPartnerId(): string | null {
+    return this.partnerId;
+  }
+
+  public getCurrentRoomId(): string | null {
+    return this.currentRoomId;
+  }
+
+  public getIsInitiator(): boolean {
+    return this.isInitiator;
+  }
 }
 
 // Export singleton instance

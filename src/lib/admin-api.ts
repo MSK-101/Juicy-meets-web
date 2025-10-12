@@ -15,7 +15,7 @@ export const adminApiFunctions = {
       const data = await adminApi.get<ApiResponse<DashboardData>>('/admin/dashboard');
       return data;
     } catch (error) {
-      
+
       throw error;
     }
   },
@@ -44,17 +44,17 @@ export const adminApiFunctions = {
       const data = await adminApi.get<ApiResponse<PaginatedResponse<User>>>(`/admin/users?${params}`);
       return data;
     } catch (error) {
-      
+
       throw error;
     }
   },
 
-  getUserStats: async (): Promise<ApiResponse<{ registered: number; inactive: number; newUsers: number }>> => {
+  getUserStats: async (): Promise<ApiResponse<{ registered: number; inactive: number; newUsers: number; banned: number }>> => {
     try {
-      const data = await adminApi.get<ApiResponse<{ registered: number; inactive: number; newUsers: number }>>('/admin/users/stats');
+      const data = await adminApi.get<ApiResponse<{ registered: number; inactive: number; newUsers: number; banned: number }>>('/admin/users/stats');
       return data;
     } catch (error) {
-      
+
       throw error;
     }
   },
@@ -88,7 +88,7 @@ export const adminApiFunctions = {
       const data = await adminApi.get<ApiResponse<PaginatedResponse<Video>>>(`/admin/videos?${params}`);
       return data;
     } catch (error) {
-      
+
       throw error;
     }
   },
@@ -98,7 +98,7 @@ export const adminApiFunctions = {
       const data = await adminApi.get<ApiResponse<{ pools: string[]; sequences: string[] }>>('/admin/videos/filters');
       return data;
     } catch (error) {
-      
+
       throw error;
     }
   },
@@ -112,7 +112,7 @@ export const adminApiFunctions = {
       });
       return data;
     } catch (error) {
-      
+
       throw error;
     }
   },

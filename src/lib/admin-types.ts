@@ -49,6 +49,7 @@ export interface UserStats {
   registered: number;
   inactive: number;
   newUsers: number;
+  banned: number;
 }
 
 export interface UsersData {

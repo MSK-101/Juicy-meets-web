@@ -52,6 +52,13 @@ export const nextSwipe = async (
       const { useAuthStore } = await import('../store/auth');
       const authStore = useAuthStore.getState();
 
+      // Check if current user got suspended during swipe
+      if ((result.updatedUserInfo as any).user_status === 'suspended') {
+        console.log('🚫 User got suspended during swipe - logging out');
+        authStore.handleUserBan();
+        return { success: false, error: 'User suspended' };
+      }
+
       authStore.setSequenceInfo(
         result.updatedUserInfo.sequence_id,
         result.updatedUserInfo.videos_watched_in_current_sequence,

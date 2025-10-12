@@ -23,7 +23,7 @@ export default function VideoChatPage() {
   const router = useRouter();
 
   // Get user info from auth store
-  const user = useAuthStore((state) => state.user);
+  const handleUserBan = useAuthStore((state) => state.handleUserBan);
 
   // Start with empty chat
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -41,6 +41,7 @@ export default function VideoChatPage() {
   const [isClient, setIsClient] = useState(false);
   const [coinBalance, setCoinBalance] = useState<number>(0);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+  const [partnerId, setPartnerId] = useState<string | null>(null);
 
   // Touch gesture state for mobile swipe
   const [touchStart, setTouchStart] = useState<{ x: number; y: number } | null>(null);
@@ -162,7 +163,7 @@ export default function VideoChatPage() {
         }
       }
     } catch (error) {
-
+      console.error('Error in handleSwipeToNext:', error);
     }
   };
 
@@ -189,19 +190,33 @@ export default function VideoChatPage() {
         router.push('/');
         return;
       }
+
+      // Check if user is banned
+      if (storedUser.user_status === 'suspended') {
+        handleUserBan();
+        return;
+      }
+
       // User is authenticated, set user ID and coin balance
       setUserId(storedUser.id.toString());
       setCoinBalance(storedUser.coin_balance);
       setIsCheckingAuth(false);
 
-      // Initialize deduction rules
-      coinDeductionService.initializeDeductionRules().then(() => {
-        // Deduction rules are loaded but not displayed
+      // Initialize deduction rules and refresh balance from server
+      coinDeductionService.initializeDeductionRules().then(async () => {
+        // Refresh balance from server to ensure it's current
+        try {
+          const currentBalance = await coinDeductionService.getUserBalance();
+          setCoinBalance(currentBalance);
+          userService.updateUserCoinBalance(currentBalance);
+        } catch (error) {
+          console.error('Failed to refresh balance from server:', error);
+        }
       }).catch(() => {
         // Silent error handling
       });
     }
-  }, [isClient, router]);
+  }, [isClient, router, handleUserBan]);
 
   // Listen for coin deduction events
   useEffect(() => {
@@ -209,20 +224,13 @@ export default function VideoChatPage() {
 
     const handleCoinDeduction = (event: CustomEvent) => {
       const result = event.detail;
-
-      // Update coin balance in frontend state
       setCoinBalance(result.new_balance);
-
-      // Sync the new balance with localStorage
       userService.updateUserCoinBalance(result.new_balance);
-
-      // Show notification for deduction
-      if (result.deducted > 0) {
-      }
     };
 
     const handleCoinDeductionError = (event: CustomEvent) => {
       const result = event.detail;
+      console.error('Coin deduction error:', result);
     };
 
     window.addEventListener('coinDeductionApplied', handleCoinDeduction as EventListener);
@@ -233,6 +241,16 @@ export default function VideoChatPage() {
       window.removeEventListener('coinDeductionError', handleCoinDeductionError as EventListener);
     };
   }, [isClient]);
+
+  // Update partner ID when connection state changes
+  useEffect(() => {
+    if (connectionState === 'connected') {
+      const currentPartnerId = cleanVideoChatService.getPartnerId();
+      setPartnerId(currentPartnerId);
+    } else {
+      setPartnerId(null);
+    }
+  }, [connectionState]);
 
   // Initialize clean video chat service
   const initializeVideoChat = useCallback(async () => {
@@ -469,6 +487,7 @@ export default function VideoChatPage() {
     return () => clearInterval(durationInterval);
   }, [isClient, isInitialized]);
 
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
@@ -565,7 +584,7 @@ export default function VideoChatPage() {
         await cleanVideoChatService.sendMessage(input.trim());
 
       } catch (error) {
-
+        console.error('Error sending message:', error);
         // You might want to show an error to the user here
       }
     }
@@ -657,7 +676,14 @@ export default function VideoChatPage() {
 
             {/* Desktop: Left screen controls - Flag, Male, Female icons */}
             <div className="hidden md:flex flex-col gap-4 absolute top-4 right-4 z-10 items-end">
-              <FlagButton />
+              <FlagButton
+                reportedUserId={partnerId && partnerId !== 'video' ? partnerId : undefined}
+                onReportSuccess={async () => {
+                  console.log('User reported successfully - triggering swipe');
+                  // Trigger swipe to next match after reporting
+                  await handleSwipeToNext();
+                }}
+              />
               <MaleIcon />
               <FemaleIcon />
             </div>
@@ -715,7 +741,14 @@ export default function VideoChatPage() {
         <div className="md:hidden flex flex-col gap-4 absolute top-4 right-1 z-20 items-center">
           <DiamondCountBar count={coinBalance} />
           <div className="flex flex-col gap-4 items-end">
-            <FlagButton />
+            <FlagButton
+              reportedUserId={partnerId && partnerId !== 'video' ? partnerId : undefined}
+              onReportSuccess={async () => {
+                console.log('User reported successfully - triggering swipe');
+                // Trigger swipe to next match after reporting
+                await handleSwipeToNext();
+              }}
+            />
             <MaleIcon />
             <FemaleIcon />
           </div>

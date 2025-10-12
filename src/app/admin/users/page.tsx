@@ -10,7 +10,7 @@ import { useAdminToken } from "@/store/adminAuth";
 
 export default function Users() {
   const [users, setUsers] = useState<User[]>([]);
-  const [stats, setStats] = useState({ registered: 0, inactive: 0, newUsers: 0 });
+  const [stats, setStats] = useState({ registered: 0, inactive: 0, newUsers: 0, banned: 0 });
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -32,7 +32,7 @@ export default function Users() {
         setTotalUsers(usersResponse.data.total);
         setStats(statsResponse.data);
       } catch (error) {
-        
+
       } finally {
         setLoading(false);
       }
@@ -52,6 +52,10 @@ export default function Users() {
     { key: "coinPurchased", label: "Coins Purchased" },
     { key: "deposits", label: "Number of Purchases" },
     { key: "totalSpent", label: "Total Spent ($)" },
+    { key: "reportCount", label: "Reports Received" },
+    { key: "blockedUsersCount", label: "Users Blocked" },
+    { key: "status", label: "Status" },
+    { key: "banReason", label: "Ban Reason" },
     { key: "lastLogin", label: "Last Activity" },
   ];
 
@@ -140,6 +144,10 @@ export default function Users() {
           <div className="text-center">
             <p className="text-2xl font-semibold text-gray-900">{stats.newUsers}</p>
             <p className="text-sm text-gray-600">New Users</p>
+          </div>
+          <div className="text-center">
+            <p className="text-2xl font-semibold text-red-600">{stats.banned || 0}</p>
+            <p className="text-sm text-gray-600">Banned</p>
           </div>
         </div>
       </div>
