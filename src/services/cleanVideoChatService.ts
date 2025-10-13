@@ -620,7 +620,7 @@ export class CleanVideoChatService {
       }
 
       // Join queue via API - backend may return immediate match
-      const response = await api.post('/video_chat/join', {});
+      const response = await api.post('/video_chat/join', {}) as any;
 
       // Check if we got an immediate match
       if (response && response.status === 'matched') {
