@@ -2578,14 +2578,26 @@ Your browser or device does not support camera access.
       // Set up event handlers
       this.setupPeerConnectionHandlers();
 
-      // Add local stream
-      if (this.localStream) {
-        this.localStream.getTracks().forEach(track => {
-          if (this.peerConnection) {
-            this.peerConnection.addTrack(track, this.localStream!);
+      // Add local stream (simple + safe)
+      if (this.localStream && this.peerConnection) {
+        const pc = this.peerConnection;
+        const canAddTrack = typeof (pc as any).addTrack === 'function';
+        const canAddStream = typeof (pc as any).addStream === 'function';
+
+        // Skip if closed
+        if ((pc as RTCPeerConnection).connectionState === 'closed') {
+          // Don't attach to a closed connection
+        } else if (canAddTrack) {
+          const existing = typeof pc.getSenders === 'function' ? pc.getSenders() : [];
+          for (const track of this.localStream.getTracks()) {
+            if (!track || track.readyState === 'ended') continue;
+            const already = Array.isArray(existing) && existing.some(s => s && s.track && s.track.id === track.id);
+            if (already) continue;
+            try { (pc as RTCPeerConnection).addTrack(track, this.localStream); } catch {}
           }
-        });
-      } else {
+        } else if (canAddStream) {
+          try { (pc as any).addStream(this.localStream); } catch {}
+        }
       }
 
     } catch (error) {
