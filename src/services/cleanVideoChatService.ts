@@ -140,38 +140,11 @@ export class CleanVideoChatService {
 
   private clearWaitingRoom() {
     try {
-      // Prefer fetch with keepalive to include Authorization header
-      const userId = this.getAuthenticatedUserId();
-      const token = this.getAuthToken();
-      console.log('userId', userId);
-      console.log('token', token);
-      console.log('typeof fetch', typeof fetch);
-      if (userId && token && typeof fetch !== 'undefined') {
-        // Fire-and-forget; keepalive allows the request to outlive the page
-        fetch('/api/v1/video_chat/leave', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify({ user_id: userId, ts: Date.now() }),
-          keepalive: true
-        }).catch(() => {
-          // Fallback to beacon if fetch fails
-          try {
-            navigator.sendBeacon('/api/v1/video_chat/leave', JSON.stringify({ user_id: userId, ts: Date.now() }));
-          } catch {}
-        });
-      } else {
-        // Last-resort fallback (may be unauthorized if no cookie-based auth)
-        try {
-          navigator.sendBeacon('/api/v1/video_chat/leave', JSON.stringify({ user_id: userId, ts: Date.now() }));
-        } catch {}
-      }
-    } catch (error) {
-
-    }
-    console.log('leaveChat');
+      // Align with other requests: use shared api wrapper (adds Authorization, base URL, CORS config)
+      // Fire-and-forget; do not await during visibilitychange/unload
+      // eslint-disable-next-line @typescript-eslint/no-floating-promises
+      api.post('/video_chat/leave', { user_id: this.getAuthenticatedUserId(), ts: Date.now() });
+    } catch {}
   }
 
   // Public helper to clear waiting room explicitly (used on route unmount)
