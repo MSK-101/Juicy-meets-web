@@ -497,6 +497,9 @@ export default function VideoChatPage() {
 
         // Cleanup video chat service
         cleanVideoChatService.cleanup();
+
+        // Ensure waiting room is cleared on route change/unmount
+        try { cleanVideoChatService.leaveWaitingRoom(); } catch {}
       }
     };
   }, [isInitialized]);

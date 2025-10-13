@@ -125,34 +125,58 @@ export class CleanVideoChatService {
     if (typeof window === 'undefined') return;
 
     const handlePageUnload = (_event: BeforeUnloadEvent) => {
-
-      // Attempt to leave chat (may not complete due to page unload timing)
-      try {
-        // Use sendBeacon for more reliable cleanup during page unload
-        const userId = this.getAuthenticatedUserId();
-        const token = this.getAuthToken();
-
-        if (userId && token) {
-          navigator.sendBeacon('/api/v1/video_chat/leave', JSON.stringify({}));
-        }
-      } catch (error) {
-
-      }
-
+      // Clear server-side waiting room first
+      this.clearWaitingRoom();
       // Clean up local resources immediately
       this.cleanup();
     };
 
     // Handle page unload/refresh
     window.addEventListener('beforeunload', handlePageUnload);
+    // Handle pagehide on mobile
+    // Handle tab hidden: clear waiting room without tearing down local state
 
-    // Handle tab close/navigation
-    window.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'hidden') {
-        // Don't cleanup immediately as user might come back
+  }
+
+  private clearWaitingRoom() {
+    try {
+      // Prefer fetch with keepalive to include Authorization header
+      const userId = this.getAuthenticatedUserId();
+      const token = this.getAuthToken();
+      console.log('userId', userId);
+      console.log('token', token);
+      console.log('typeof fetch', typeof fetch);
+      if (userId && token && typeof fetch !== 'undefined') {
+        // Fire-and-forget; keepalive allows the request to outlive the page
+        fetch('/api/v1/video_chat/leave', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ user_id: userId, ts: Date.now() }),
+          keepalive: true
+        }).catch(() => {
+          // Fallback to beacon if fetch fails
+          try {
+            navigator.sendBeacon('/api/v1/video_chat/leave', JSON.stringify({ user_id: userId, ts: Date.now() }));
+          } catch {}
+        });
+      } else {
+        // Last-resort fallback (may be unauthorized if no cookie-based auth)
+        try {
+          navigator.sendBeacon('/api/v1/video_chat/leave', JSON.stringify({ user_id: userId, ts: Date.now() }));
+        } catch {}
       }
-    });
+    } catch (error) {
 
+    }
+    console.log('leaveChat');
+  }
+
+  // Public helper to clear waiting room explicitly (used on route unmount)
+  public leaveWaitingRoom(): void {
+    this.clearWaitingRoom();
   }
 
   // Initialize real-time match notifications
