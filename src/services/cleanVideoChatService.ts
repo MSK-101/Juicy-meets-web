@@ -619,10 +619,16 @@ export class CleanVideoChatService {
         throw new Error('Camera access is required for video chat. Please allow camera permissions and try again.');
       }
 
-      // Join queue via API - backend will send instant notification when match found
-      await api.post('/video_chat/join', {});
+      // Join queue via API - backend may return immediate match
+      const response = await api.post('/video_chat/join', {});
 
-      console.log('✅ Joined queue with real-time notifications');
+      // Check if we got an immediate match
+      if (response && response.status === 'matched') {
+        console.log('🎯 IMMEDIATE MATCH: Got match from join response');
+        await this.handleInstantMatch(response);
+      } else {
+        console.log('✅ Joined queue with real-time notifications');
+      }
 
       // Pre-warm peer connection for faster matching
       this.prewarmPeerConnection();

@@ -252,6 +252,28 @@ export default function VideoChatPage() {
     }
   }, [connectionState]);
 
+  // Set up video match callback immediately
+  useEffect(() => {
+    cleanVideoChatService.onVideoMatch((videoData) => {
+      console.log('🎬 UI: Video match received:', videoData);
+
+      setConnectionState('connected');
+      setError(null);
+
+      // Clear live connection state when video match starts
+      setRemoteStream(null);
+      setMessages([]);
+
+      setIsVideoPlaying(true);
+      setCurrentVideoId(videoData.videoId);
+      setCurrentVideoUrl(videoData.videoUrl);
+      setCurrentVideoName(videoData.videoName);
+
+      // Start new tracking for video
+      coinDeductionService.startChatDurationTracking();
+    });
+  }, []);
+
   // Initialize clean video chat service
   const initializeVideoChat = useCallback(async () => {
     if (!isClient || isInitialized || isConnecting) {
@@ -275,26 +297,6 @@ export default function VideoChatPage() {
       setUserId(currentUserId);
 
             // Note: Remote stream callback already set up in early useEffect to prevent timing issues
-
-      // Set up video match event listener
-      cleanVideoChatService.onVideoMatch((videoData) => {
-        console.log('🎬 UI: Video match received:', videoData);
-
-        setConnectionState('connected');
-        setError(null);
-
-        // CRITICAL FIX: Clear ALL live connection state when video match starts
-        setRemoteStream(null);
-        setMessages([]); // Clear any existing messages
-
-        setIsVideoPlaying(true);
-        setCurrentVideoId(videoData.videoId);
-        setCurrentVideoUrl(videoData.videoUrl);
-        setCurrentVideoName(videoData.videoName);
-
-        // Start new tracking for video
-        coinDeductionService.startChatDurationTracking();
-      });
 
       // Get local stream from video chat service
       try {
