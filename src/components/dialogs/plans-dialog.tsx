@@ -60,7 +60,7 @@ export default function PlansDialog({
       const successUrl = `/purchase/success?package=${encodeURIComponent(selectedPackage.name)}&coins=${selectedPackage.coins_count}`;
       router.push(successUrl);
     } catch (error) {
-      
+
       alert("Purchase failed. Please try again.");
     }
   };
@@ -109,13 +109,13 @@ export default function PlansDialog({
                 },
               }}
             >
-                            {coinPackages.map((coinPackage, index) => (
+              {coinPackages.map((coinPackage, index) => (
                 <SwiperSlide key={coinPackage.id} className="my-auto pb-10">
                   <div
                     className={`py-4 px-6 xl:py-6 xl:px-8 border rounded-3xl cursor-pointer transition-all duration-200 ${
                       selectedPackage?.id === coinPackage.id
-                        ? "border-[#9747FF] bg-purple-50 shadow-lg"
-                        : "border-[#515151] hover:border-[#9747FF] hover:bg-purple-50"
+                        ? "border-[#9747FF] shadow-lg"
+                        : "border-[#515151] hover:border-[#9747FF]"
                     } ${index === 1 ? "py-7 xl:py-9 gradient-border" : ""}`}
                     onClick={() => handlePackageClick(coinPackage)}
                   >
