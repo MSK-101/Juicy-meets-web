@@ -23,7 +23,7 @@ export interface DeductionResult {
 
 class CoinDeductionService {
   private activeRules: DeductionRule[] = [];
-  private appliedThresholds: Set<number> = new Set();
+  private appliedThresholds: Map<number, number> = new Map(); // threshold -> last applied duration
   private chatStartTime: number | null = null;
   private durationCheckInterval: NodeJS.Timeout | null = null;
   private currentBalance: number = 0;
@@ -68,20 +68,27 @@ class CoinDeductionService {
     this.isBalanceZero = false; // Reset for next session
   }
 
-  // Check and apply deductions based on current duration - OPTIMIZED
+  // Check and apply deductions based on current duration - RECURRING
   private async checkAndApplyDeductions(): Promise<void> {
     if (!this.chatStartTime || this.isBalanceZero) return;
 
     const currentDuration = Math.floor((Date.now() - this.chatStartTime) / 1000);
 
-    // Check each rule to see if we've reached the threshold
+    // Check each rule for recurring deductions
     for (const rule of this.activeRules) {
-      if (currentDuration === rule.threshold_seconds && !this.appliedThresholds.has(rule.threshold_seconds)) {
+      const lastApplied = this.appliedThresholds.get(rule.threshold_seconds) || 0;
+
+      // Check if we've reached a new multiple of the threshold
+      if (currentDuration > 0 &&
+          currentDuration % rule.threshold_seconds === 0 &&
+          currentDuration > lastApplied) {
         try {
+          // CRITICAL FIX: Update tracking IMMEDIATELY to prevent race condition
+          this.appliedThresholds.set(rule.threshold_seconds, currentDuration);
+
           const result = await this.applyDurationDeduction(currentDuration);
 
           if (result.success) {
-            this.appliedThresholds.add(rule.threshold_seconds);
 
             // Update cached balance
             this.currentBalance = result.new_balance;
@@ -93,10 +100,14 @@ class CoinDeductionService {
             // Emit event for UI updates
             this.emitDeductionApplied(result);
           } else {
+            // CRITICAL FIX: Reset tracking if deduction failed to allow retry
+            this.appliedThresholds.set(rule.threshold_seconds, lastApplied);
             // Emit error event for UI feedback
             this.emitDeductionError(result);
           }
         } catch (error) {
+          // CRITICAL FIX: Reset tracking if API call failed to allow retry
+          this.appliedThresholds.set(rule.threshold_seconds, lastApplied);
           // Emit error event for UI feedback
           this.emitDeductionError({
             success: false,
