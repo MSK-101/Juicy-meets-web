@@ -179,7 +179,8 @@ export default function VideoChatPage() {
     // Stop tracking chat duration for coin deductions
     coinDeductionService.stopChatDurationTracking();
 
-    // User can swipe again for next match
+    // Automatically trigger next match
+    handleSwipeToNext();
   };
 
   // Check authentication and redirect if no user

@@ -24,7 +24,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   }, [videoUrl]);
 
   const handleEnded = () => {
-    // Video will loop automatically, no need to do anything
+    onVideoEnd();
   };
 
   const handleError = () => {
@@ -55,8 +55,8 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         className="w-full h-full object-cover"
         autoPlay
         playsInline
-        muted
-        loop
+        muted={false}
+        loop={false}
         onEnded={handleEnded}
         onError={handleError}
       >
