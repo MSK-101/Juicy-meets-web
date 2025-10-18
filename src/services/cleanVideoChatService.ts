@@ -292,21 +292,37 @@ export class CleanVideoChatService {
       // Ensure local stream is ready
       await this.ensureLocalStreamHealth();
 
-      // Create peer connection FIRST for faster ICE gathering
-      await this.setupPeerConnectionOnly();
-
-      // Setup PubNub signaling channel (parallel to ICE gathering)
-      await this.setupPubNubConnection();
-
       // Update UI immediately
       if (this.onConnectionStateCallback) {
         this.onConnectionStateCallback('connecting' as RTCPeerConnectionState);
       }
 
-      // Start connection timeout (reduced for real-time)
-      this.startConnectionTimeoutMonitoring();
+      // CRITICAL FIX: Prevent race condition between initiator and receiver
+      if (this.isInitiator) {
+        // Initiator starts immediately to prevent delays
+        console.log('🚀 INITIATOR: Starting WebRTC setup immediately...');
+        await this.setupPeerConnectionOnly();
+        await this.setupPubNubConnection();
+        this.startConnectionTimeoutMonitoring();
+      } else {
+        // Non-initiator waits briefly to avoid race condition
+        console.log('⏳ RECEIVER: Waiting brief moment to avoid race condition...');
+        setTimeout(async () => {
+          try {
+            await this.setupPeerConnectionOnly();
+            await this.setupPubNubConnection();
+            this.startConnectionTimeoutMonitoring();
+            console.log('✅ RECEIVER: Delayed setup complete');
+          } catch (error) {
+            console.error('❌ RECEIVER: Delayed setup failed:', error);
+            // Fallback to polling on error
+            this.enablePollingFallback = true;
+            this.startStatusChecking();
+          }
+        }, 100); // Receiver sets up before initiator creates offer
+      }
 
-      console.log('✅ INSTANT WEBRTC: Connection setup complete');
+      console.log('✅ INSTANT WEBRTC: Connection setup initiated');
     } catch (error) {
       console.error('❌ INSTANT WEBRTC: Setup failed:', error);
       throw error;
@@ -2148,34 +2164,30 @@ Your browser or device does not support camera access.
   private async handlePubNubJoin(): Promise<void> {
 
     try {
-      // BOTH users send ready signals to ensure proper synchronization
+      // CRITICAL FIX: Simplified handshake - only initiator starts offer creation
       if (this.partnerId && !this.hasSentReadySignal) {
-
         this.hasSentReadySignal = true;
 
-        await pubnubService.sendReady(this.partnerId);
-
         if (this.isInitiator) {
-          // OPTIMIZED: Immediate offer creation for fastest connection
-          console.log('🚀 Initiator: Creating offer immediately...');
+          // INITIATOR: Create and send offer immediately (no ready signals needed)
+          console.log('🚀 INITIATOR: Creating offer immediately...');
+
           setTimeout(async () => {
             try {
-              console.log('🎯 Creating and sending offer...');
+              console.log('🎯 INITIATOR: Creating and sending offer...');
               await this.createAndSendOffer();
-              console.log('✅ Offer sent successfully');
+              console.log('✅ INITIATOR: Offer sent successfully');
             } catch (error) {
-              console.log('❌ Error creating offer:', error);
+              console.log('❌ INITIATOR: Error creating offer:', error);
             }
-          }, 50); // Ultra-fast: Minimal delay for PubNub stabilization
+          }, 200); // Allow PubNub channel to stabilize
         } else {
-          // Receiver: Just wait for offer
+          // RECEIVER: Just wait for offer (no ready signal needed)
+          console.log('⏳ RECEIVER: PubNub connected, waiting for offer...');
         }
-      } else if (this.hasSentReadySignal) {
-
-      } else {
       }
     } catch (error) {
-
+      console.error('❌ Error in PubNub join handshake:', error);
     }
   }
 
