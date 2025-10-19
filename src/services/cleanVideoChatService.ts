@@ -2180,7 +2180,7 @@ Your browser or device does not support camera access.
             } catch (error) {
               console.log('❌ INITIATOR: Error creating offer:', error);
             }
-          }, 200); // Allow PubNub channel to stabilize
+          }, 300); // Allow PubNub channel to stabilize
         } else {
           // RECEIVER: Just wait for offer (no ready signal needed)
           console.log('⏳ RECEIVER: PubNub connected, waiting for offer...');

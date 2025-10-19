@@ -20,30 +20,30 @@ export interface MeteredCredentials {
 
 // Metered TURN credentials
 const METERED_CREDENTIALS: MeteredCredentials = {
-  username: '4b80f5cd2e329778469772fc',
-  password: '7lymmbrPhjKfZ7gX',
-  apiKey: '84cbdd69dd97bfd9b5e39a66a2c08e985766'
+  username: 'f5d9e26eb60bffec4d4d10f5',
+  password: 'CCROG7MUTtQk3yCD',
+  apiKey: '21dc0219183a663c3536512f5f87fdf25323'
 };
 
-// Static ICE servers configuration (optimized for Indian region with 4 servers)
+// Static ICE servers configuration (optimized with 4 metered servers)
 export const STATIC_ICE_SERVERS: ICEServerConfig[] = [
   // Primary STUN server
   {
     urls: 'stun:stun.relay.metered.ca:80'
   },
-  // TURN server (UDP) - most common protocol for Indian region
+  // TURN server (UDP) - most common protocol
   {
     urls: 'turn:in.relay.metered.ca:80',
     username: METERED_CREDENTIALS.username,
     credential: METERED_CREDENTIALS.password
   },
-  // TURN server (TCP) - for restrictive networks in India
+  // TURN server (TCP) - for restrictive networks
   {
     urls: 'turn:in.relay.metered.ca:80?transport=tcp',
     username: METERED_CREDENTIALS.username,
     credential: METERED_CREDENTIALS.password
   },
-  // TURN server (TLS) - for secure connections in India
+  // TURN server (TLS) - for secure connections
   {
     urls: 'turns:in.relay.metered.ca:443?transport=tcp',
     username: METERED_CREDENTIALS.username,
@@ -99,16 +99,16 @@ export async function getOptimalIceServers(): Promise<ICEServerConfig[]> {
       return dynamicServers.slice(0, 4);
     }
 
-    // Fallback to static configuration (optimized for Indian region with 4 servers)
+    // Fallback to static configuration (optimized with 4 metered servers)
     return STATIC_ICE_SERVERS;
   } catch (error) {
     console.warn('Using fallback ICE servers due to error:', error);
     // Use only the most essential servers to stay under 4 limit
     return [
       STATIC_ICE_SERVERS[0], // Primary STUN
-      STATIC_ICE_SERVERS[1], // Primary TURN UDP (India)
-      STATIC_ICE_SERVERS[2], // TURN TCP (India)
-      STATIC_ICE_SERVERS[3]  // TURN TLS (India)
+      STATIC_ICE_SERVERS[1], // Primary TURN UDP
+      STATIC_ICE_SERVERS[2], // TURN TCP
+      STATIC_ICE_SERVERS[3]  // TURN TLS
     ];
   }
 }
