@@ -1,7 +1,7 @@
 import { useAuthStore } from "@/store/auth";
 import { useErrorStore } from "@/store/error";
 
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api/v1";
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL  || "http://localhost:3000/api/v1";
 
 // Debug: Log the BASE_URL being used
 
@@ -54,7 +54,7 @@ export const apiRequest = async (
         bodyData.email = userEmail;
         requestBody = JSON.stringify(bodyData);
       } catch (error) {
-        
+
       }
     } else if (options.method === 'POST' && !requestBody) {
       // If no body exists, create one with just the email
