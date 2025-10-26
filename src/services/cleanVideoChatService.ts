@@ -1690,6 +1690,10 @@ Your browser or device does not support camera access.
 
     // Log polling adjustment for debugging
     console.log(`🔄 Polling interval adjusted to: ${this.pollingInterval}ms (empty responses: ${this.consecutiveEmptyResponses})`);
+    if(this.consecutiveEmptyResponses > 10) {
+      this.handleConnectionFailure();
+      return;
+    }
   }
 
   // Resume polling when user takes action
