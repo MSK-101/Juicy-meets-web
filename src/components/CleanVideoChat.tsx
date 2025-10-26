@@ -91,7 +91,7 @@ export const CleanVideoChat: React.FC = () => {
       await cleanVideoChatService.joinQueue();
       setStatus('waiting');
     } catch (err) {
-      
+
       setError(err instanceof Error ? err.message : 'Failed to start video chat');
       setStatus('error');
     }
@@ -112,7 +112,7 @@ export const CleanVideoChat: React.FC = () => {
         remoteVideoRef.current.src = ''; // Clear video URL as well
       }
     } catch (err) {
-      
+
     }
   };
 
@@ -221,6 +221,7 @@ export const CleanVideoChat: React.FC = () => {
           </div>
         </div>
       </div>
+
 
       {/* Controls */}
       <div className="bg-gray-800 border-t border-gray-700">
