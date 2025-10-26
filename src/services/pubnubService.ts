@@ -43,6 +43,15 @@ class PubNubService {
         publishKey,
         subscribeKey,
         uuid: `user-${Date.now()}`,
+        // PAKISTAN FIX: Try alternative PubNub endpoints if DNS fails
+        origin: 'pubsub.pubnub.com', // Fallback endpoint that might work better in Pakistan
+        restore: true, // Auto-reconnect on network issues
+        keepAlive: true, // Keep connection alive
+        // Increase timeouts for Pakistan's potentially slower network
+        subscribeRequestTimeout: 310000, // 310 seconds
+        transactionalRequestTimeout: 15000, // 15 seconds
+        // Auto network detection for better reliability
+        autoNetworkDetection: true
       });
 
     } catch (error) {
@@ -181,6 +190,11 @@ class PubNubService {
         sessionVersion: this.sessionVersion
       }
     });
+  }
+
+  // Send ready signal (alias for consistency)
+  async sendReadySignal(to: string, sessionVersion: string): Promise<void> {
+    return this.sendReady(to);
   }
 
   // Send WebRTC offer

@@ -61,6 +61,12 @@ export class CleanVideoChatService {
   private prewarmedPeerConnection: RTCPeerConnection | null = null;
   private isPrewarmingConnection = false;
 
+  // Ultra-fast connection optimizations
+  private preWarmedConnection: RTCPeerConnection | null = null;
+  private iceCandidatesReady = false;
+  private cachedIceCandidates: RTCIceCandidate[] = [];
+  private matchType: string | null = null;
+
   // Track last connection state to prevent redundant updates
   private lastConnectionState: RTCPeerConnectionState | null = null;
 
@@ -81,31 +87,74 @@ export class CleanVideoChatService {
   private iceProcessingTimeout: NodeJS.Timeout | null = null;
 
   // Real-time notifications via PubNub (replaces polling)
-  private matchNotificationPubNub: any = null;
+  private matchNotificationPubNub: any = null; // eslint-disable-line @typescript-eslint/no-explicit-any
   private matchNotificationChannel: string | null = null;
   private isListeningForMatches = false;
 
-  // Legacy polling (disabled by default, only for fallback)
-  private pollingInterval = 2000;
-  private maxPollingInterval = 10000;
-  private minPollingInterval = 1000;
-  private pollingBackoffMultiplier = 1.5;
+  // Legacy polling (disabled by default, only for fallback) - optimized for speed
+  private pollingInterval = 1000; // Start faster
+  private maxPollingInterval = 5000; // Lower max to prevent long delays
+  private minPollingInterval = 500; // More aggressive minimum
+  private pollingBackoffMultiplier = 2; // Faster backoff to reduce conflicts
   private consecutiveEmptyResponses = 0;
-  private lastStatusResponse: any = null;
-  private maxConsecutiveEmptyResponses = 5;
+  private lastStatusResponse: any = null; // eslint-disable-line @typescript-eslint/no-explicit-any
+  private maxConsecutiveEmptyResponses = 3; // Reduce to stop polling sooner
   private isPollingPaused = false;
   private pausePollingUntil: number | null = null;
   private enablePollingFallback = false; // Disabled by default
 
   constructor() {
-    // Initialize ICE servers
-    this.initializeIceServers();
+    // Only initialize on client side
+    if (typeof window !== 'undefined') {
+      // Initialize ICE servers
+      this.initializeIceServers();
 
-    // Set up cleanup for page unload/refresh
-    this.setupPageUnloadHandler();
+      // Set up cleanup for page unload/refresh
+      this.setupPageUnloadHandler();
 
-    // Initialize real-time notifications
-    this.initializeMatchNotifications();
+      // Initialize real-time notifications
+      this.initializeMatchNotifications();
+
+      // Pre-warm connection for ultra-fast setup
+      this.preWarmConnection();
+    }
+  }
+
+  // Pre-warm connection for ultra-fast setup
+  private async preWarmConnection(): Promise<void> {
+    if (this.preWarmedConnection || typeof window === 'undefined') return;
+
+    console.log('🔥 Pre-warming WebRTC connection...');
+
+    try {
+      // Use configured ICE servers (includes metered service)
+      const iceServers = this.iceServerConfig?.iceServers || [
+        { urls: 'stun:stun.l.google.com:19302' }
+      ];
+
+      this.preWarmedConnection = new RTCPeerConnection({
+        iceServers: iceServers,
+        iceCandidatePoolSize: 10 // Pre-gather candidates
+      });
+
+      // Pre-gather ICE candidates
+      this.preWarmedConnection.onicecandidate = (event) => {
+        if (event.candidate) {
+          this.cachedIceCandidates.push(event.candidate);
+        } else {
+          this.iceCandidatesReady = true;
+          console.log('🔥 ICE candidates pre-gathered!');
+        }
+      };
+
+      // Create dummy offer to trigger ICE gathering
+      const dummyOffer = await this.preWarmedConnection.createOffer();
+      await this.preWarmedConnection.setLocalDescription(dummyOffer);
+
+    } catch (error) {
+      console.error('Pre-warming failed:', error);
+      // Continue without pre-warmed connection
+    }
   }
 
   // Initialize ICE server configuration
@@ -124,7 +173,7 @@ export class CleanVideoChatService {
   private setupPageUnloadHandler(): void {
     if (typeof window === 'undefined') return;
 
-    const handlePageUnload = (_event: BeforeUnloadEvent) => {
+    const handlePageUnload = () => {
       // Clear server-side waiting room first
       this.clearWaitingRoom();
       // Clean up local resources immediately
@@ -142,7 +191,6 @@ export class CleanVideoChatService {
     try {
       // Align with other requests: use shared api wrapper (adds Authorization, base URL, CORS config)
       // Fire-and-forget; do not await during visibilitychange/unload
-      // eslint-disable-next-line @typescript-eslint/no-floating-promises
       api.post('/video_chat/leave', { user_id: this.getAuthenticatedUserId(), ts: Date.now() });
     } catch {}
   }
@@ -183,7 +231,7 @@ export class CleanVideoChatService {
     }
   }
 
-  // Start listening for match notifications
+  // Start listening for match notifications - WAITS for subscription to complete
   private async startMatchNotifications(userId: string): Promise<void> {
     if (!this.matchNotificationPubNub || this.isListeningForMatches) {
       return;
@@ -192,30 +240,47 @@ export class CleanVideoChatService {
     this.matchNotificationChannel = `user.${userId}.matches`;
     this.isListeningForMatches = true;
 
-    this.matchNotificationPubNub.addListener({
-      message: (messageEvent: any) => {
-        try {
-          const notification = messageEvent.message;
-          this.handleMatchNotification(notification);
-        } catch (error) {
-          console.error('Error processing match notification:', error);
-        }
-      },
-      status: (statusEvent: any) => {
-        if (statusEvent.category === 'PNConnectedCategory') {
-          console.log('✅ Connected to match notifications');
-        } else if (statusEvent.category === 'PNNetworkIssuesCategory') {
-          console.warn('⚠️ Network issues with match notifications');
-        }
-      }
-    });
+    // CRITICAL FIX: Wait for PubNub connection before resolving
+    return new Promise((resolve) => {
+      let connectionEstablished = false;
 
-    this.matchNotificationPubNub.subscribe({
-      channels: [this.matchNotificationChannel],
-      withPresence: false
-    });
+      this.matchNotificationPubNub.addListener({
+        message: (messageEvent: any) => {
+          try {
+            const notification = messageEvent.message;
+            this.handleMatchNotification(notification);
+          } catch (error) {
+            console.error('Error processing match notification:', error);
+          }
+        },
+        status: (statusEvent: any) => {
+          if (statusEvent.category === 'PNConnectedCategory') {
+            console.log('✅ Connected to match notifications');
+            if (!connectionEstablished) {
+              connectionEstablished = true;
+              resolve(); // Resolve promise when connection is established
+            }
+          } else if (statusEvent.category === 'PNNetworkIssuesCategory') {
+            console.warn('⚠️ Network issues with match notifications');
+          }
+        }
+      });
 
-    console.log(`🔔 Listening for match notifications on: ${this.matchNotificationChannel}`);
+      this.matchNotificationPubNub.subscribe({
+        channels: [this.matchNotificationChannel],
+        withPresence: false
+      });
+
+      console.log(`🔔 Subscribing to match notifications: ${this.matchNotificationChannel}`);
+
+      // Safety timeout: resolve after 2 seconds even if no confirmation
+      setTimeout(() => {
+        if (!connectionEstablished) {
+          console.warn('⚠️ PubNub connection timeout, proceeding anyway');
+          resolve();
+        }
+      }, 2000);
+    });
   }
 
   // Handle incoming match notifications
@@ -245,11 +310,14 @@ export class CleanVideoChatService {
     console.log('🎯 INSTANT MATCH: Processing match data...');
 
     try {
-      // Stop any existing status checking
+      // Stop any existing status checking immediately to prevent conflicts
       if (this.statusCheckInterval) {
         clearTimeout(this.statusCheckInterval);
         this.statusCheckInterval = null;
       }
+
+      // Disable polling fallback since real-time notifications are working
+      this.enablePollingFallback = false;
 
       // Set match data immediately
       this.currentRoomId = matchData.room_id;
@@ -258,8 +326,9 @@ export class CleanVideoChatService {
       this.sessionVersion = matchData.session_version || '';
       this.waitingRoomCleared = false; // Reset for new connection
 
-      // Determine match type
+      // Determine match type and set for optimization
       const actualMatchType = matchData.actual_match_type || matchData.match_type;
+      this.matchType = actualMatchType;
 
       if (actualMatchType === 'video') {
         // Handle video match
@@ -284,43 +353,35 @@ export class CleanVideoChatService {
     }
   }
 
-  // Setup WebRTC connection optimized for instant matching
+  // Setup WebRTC connection optimized for instant matching - ULTRA-FAST
   private async setupInstantWebRTCConnection(): Promise<void> {
     console.log('🚀 INSTANT WEBRTC: Setting up connection...');
 
-    try {
-      // Ensure local stream is ready
-      await this.ensureLocalStreamHealth();
+    // Prevent double initialization
+    if (this.peerConnection && this.peerConnection.signalingState !== 'closed') {
+      console.log('⚠️ Peer connection already exists, skipping setup');
+      return;
+    }
 
-      // Update UI immediately
+    this.connectionStartTime = Date.now();
+
+    try {
+      // OPTIMIZED: Update UI immediately (don't wait for connection)
       if (this.onConnectionStateCallback) {
         this.onConnectionStateCallback('connecting' as RTCPeerConnectionState);
       }
 
-      // CRITICAL FIX: Prevent race condition between initiator and receiver
-      if (this.isInitiator) {
-        // Initiator starts immediately to prevent delays
-        console.log('🚀 INITIATOR: Starting WebRTC setup immediately...');
-        await this.setupPeerConnectionOnly();
-        await this.setupPubNubConnection();
-        this.startConnectionTimeoutMonitoring();
-      } else {
-        // Non-initiator waits briefly to avoid race condition
-        console.log('⏳ RECEIVER: Waiting brief moment to avoid race condition...');
-        setTimeout(async () => {
-          try {
-            await this.setupPeerConnectionOnly();
-            await this.setupPubNubConnection();
-            this.startConnectionTimeoutMonitoring();
-            console.log('✅ RECEIVER: Delayed setup complete');
-          } catch (error) {
-            console.error('❌ RECEIVER: Delayed setup failed:', error);
-            // Fallback to polling on error
-            this.enablePollingFallback = true;
-            this.startStatusChecking();
-          }
-        }, 100); // Receiver sets up before initiator creates offer
-      }
+      // ULTRA-FAST PARALLEL EXECUTION - All operations run simultaneously
+      await Promise.all([
+        this.ensureLocalStreamHealth(),
+        this.setupPeerConnectionOnly(),
+        this.setupPubNubConnection()
+      ]);
+
+      console.log(`⚡ Parallel setup completed in ${Date.now() - this.connectionStartTime}ms`);
+
+      // OPTIMIZED: Don't call startWebRTCConnection - PubNub join handler will create offer
+      // This eliminates duplicate work and makes connection faster
 
       console.log('✅ INSTANT WEBRTC: Connection setup initiated');
     } catch (error) {
@@ -428,10 +489,8 @@ export class CleanVideoChatService {
     return null;
   }
 
-  private async waitForAuthentication(maxWaitMs: number = 5000): Promise<string> {
+  private async waitForAuthentication(maxWaitMs: number = 2000): Promise<string> {
     const startTime = Date.now();
-    let lastValidationAttempt = 0;
-    const VALIDATION_COOLDOWN = 1000; // 1 second cooldown between validation attempts
 
     while (Date.now() - startTime < maxWaitMs) {
       const userId = this.getAuthenticatedUserId();
@@ -450,61 +509,50 @@ export class CleanVideoChatService {
               this.clearStoredAuth();
             }
           } else {
-            // Only validate if enough time has passed since last attempt
-            const timeSinceLastValidation = Date.now() - lastValidationAttempt;
-            if (timeSinceLastValidation >= VALIDATION_COOLDOWN) {
+            try {
+              // Get user email for auto-login fallback
+              let userEmail: string | undefined;
               try {
-                lastValidationAttempt = Date.now();
-
-                // Get user email for auto-login fallback
-                let userEmail: string | undefined;
-                try {
-                  const storedUser = localStorage.getItem('juicyMeetsUser');
-                  if (storedUser) {
-                    const userData = JSON.parse(storedUser);
-                    userEmail = userData.email;
-                  }
-                } catch (error) {
-
-                }
-
-                const validation = await UserService.validateToken(token, userEmail);
-
-                // Cache the validation result
-                this.tokenValidationCache = {
-                  token,
-                  isValid: validation.valid,
-                  timestamp: Date.now()
-                };
-
-                if (validation.valid) {
-
-                  // If a new token was provided (auto-login), update localStorage
-                  if (validation.token) {
-                    localStorage.setItem('juicyMeetsAuthToken', validation.token);
-                  }
-
-                  return userId;
-                } else {
-                  this.clearStoredAuth();
+                const storedUser = localStorage.getItem('juicyMeetsUser');
+                if (storedUser) {
+                  const userData = JSON.parse(storedUser);
+                  userEmail = userData.email;
                 }
               } catch (error) {
+                console.warn('Failed to parse stored user data:', error);
+              }
 
+              const validation = await UserService.validateToken(token, userEmail);
+
+              // Cache the validation result
+              this.tokenValidationCache = {
+                token,
+                isValid: validation.valid,
+                timestamp: Date.now()
+              };
+
+              if (validation.valid) {
+                // If a new token was provided (auto-login), update localStorage
+                if (validation.token) {
+                  localStorage.setItem('juicyMeetsAuthToken', validation.token);
+                }
+                return userId;
+              } else {
                 this.clearStoredAuth();
               }
-            } else {
-              // Log that we're waiting for cooldown
-              const remainingCooldown = VALIDATION_COOLDOWN - timeSinceLastValidation;
+            } catch (error) {
+              console.error('Token validation failed:', error);
+              this.clearStoredAuth();
             }
           }
         }
       }
 
-      // Wait a bit before checking again (optimized for faster auth)
-      await new Promise(resolve => setTimeout(resolve, 100));
+      // OPTIMIZED: Wait minimal time before checking again
+      await new Promise(resolve => setTimeout(resolve, 10));
     }
 
-    throw new Error('Authentication timeout - user not authenticated after 5 seconds');
+    throw new Error('Authentication timeout - user not authenticated after 2 seconds');
   }
 
   private clearStoredAuth(): void {
@@ -552,6 +600,13 @@ export class CleanVideoChatService {
   // Event listeners
   onRemoteStream(callback: (stream: MediaStream) => void) {
     this.onRemoteStreamCallback = callback;
+
+    // CRITICAL FIX: If we already have a remote stream, notify immediately
+    // This prevents the issue where ontrack fires before React component mounts
+    if (this.remoteStream) {
+      console.log('📺 onRemoteStream: Immediately notifying callback of existing remote stream');
+      setTimeout(() => callback(this.remoteStream!), 0);
+    }
   }
 
   onConnectionStateChange(callback: (state: RTCPeerConnectionState) => void) {
@@ -606,37 +661,43 @@ export class CleanVideoChatService {
         throw new Error('No authentication token available');
       }
 
-      // Start listening for match notifications BEFORE joining queue
+      // CRITICAL FIX: Set up PubNub listener BEFORE joining queue to avoid race condition
+      // This ensures we don't miss instant match notifications from backend
+      console.log('🔔 Setting up match notifications BEFORE joining queue...');
       await this.startMatchNotifications(userId);
+      console.log('✅ Match notifications ready, now joining queue...');
 
-      // Request camera permissions immediately when joining queue
-      try {
-        // Check permission state first and show appropriate messaging
-        const permissionState = await this.checkPermissionState();
-        this.showPermissionStateMessage(permissionState);
+      // PARALLEL EXECUTION: Camera permissions and queue join (PubNub already listening)
+      const [response] = await Promise.all([
+        // Join queue via API - backend may return immediate match
+        api.post('/video_chat/join', {}) as Promise<any>,
 
-        if (permissionState !== 'granted') {
-          throw new Error(`Camera permissions not granted. Current state: ${permissionState}`);
-        }
+        // Request camera permissions and get local stream in parallel
+        (async () => {
+          try {
+            // Check permission state first and show appropriate messaging
+            const permissionState = await this.checkPermissionState();
+            this.showPermissionStateMessage(permissionState);
 
-        // Get the local stream
-        await this.getLocalStream();
+            if (permissionState !== 'granted') {
+              throw new Error(`Camera permissions not granted. Current state: ${permissionState}`);
+            }
 
-      } catch (error) {
-        // Show user-friendly alert for permission denied
-        if (error instanceof Error) {
-          if (error.name === 'NotAllowedError' ||
-              error.message.includes('Permission denied') ||
-              error.message.includes('NotAllowedError')) {
-            this.showPermissionDeniedAlert();
+            // Get the local stream
+            await this.getLocalStream();
+          } catch (error) {
+            // Show user-friendly alert for permission denied
+            if (error instanceof Error) {
+              if (error.name === 'NotAllowedError' ||
+                  error.message.includes('Permission denied') ||
+                  error.message.includes('NotAllowedError')) {
+                this.showPermissionDeniedAlert();
+              }
+            }
+            throw new Error('Camera access is required for video chat. Please allow camera permissions and try again.');
           }
-        }
-
-        throw new Error('Camera access is required for video chat. Please allow camera permissions and try again.');
-      }
-
-      // Join queue via API - backend may return immediate match
-      const response = await api.post('/video_chat/join', {}) as any;
+        })()
+      ]);
 
       // Check if we got an immediate match
       if (response && response.status === 'matched') {
@@ -650,9 +711,11 @@ export class CleanVideoChatService {
       this.prewarmPeerConnection();
 
       // Only start polling if real-time notifications are not available
-      if (this.enablePollingFallback) {
-        console.log('⚠️ Using polling fallback');
+      if (this.enablePollingFallback && !this.isListeningForMatches) {
+        console.log('⚠️ Using polling fallback (real-time not available)');
         this.startStatusChecking();
+      } else {
+        console.log('✅ Using real-time notifications (polling disabled)');
       }
     } catch (error) {
       console.error('Failed to join queue:', error);
@@ -984,8 +1047,18 @@ export class CleanVideoChatService {
     this.messageBuffer.clear();
     this.processingMessages = false;
 
-    // Reset ready signal flag
+    // Reset ready signal flags and callbacks
     this.hasSentReadySignal = false;
+    this.partnerReadyReceived = false;
+    this.onPartnerReadyCallback = null;
+    this.onOfferReceivedCallback = null;
+    this.onAnswerReceivedCallback = null;
+
+    // Clear resend timer
+    if (this.readyResendTimer) {
+      clearTimeout(this.readyResendTimer);
+      this.readyResendTimer = null;
+    }
 
     // Clear ICE candidate queue
     this.iceCandidateQueue = [];
@@ -1441,57 +1514,6 @@ Your browser or device does not support camera access.
     }
   }
 
-    // Fetch video details and create video stream from actual video file
-  private async createVideoStreamFromFile(videoId: number): Promise<MediaStream | null> {
-    try {
-
-      // Fetch video details from backend
-      const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || '/api/v1';
-      const response = await fetch(`${API_BASE_URL}/videos/${videoId}/public`);
-
-      if (!response.ok) {
-        throw new Error(`Failed to fetch video: ${response.status}`);
-      }
-
-      const data = await response.json();
-      const video = data.data.video;
-
-      if (!video.video_file_url) {
-        return null;
-      }
-
-      // Try to create a video element and capture its stream
-      const videoElement = document.createElement('video');
-      videoElement.crossOrigin = 'anonymous';
-      videoElement.muted = true;
-      videoElement.playsInline = true;
-      videoElement.src = video.video_file_url;
-
-      // Wait for video to load
-      await new Promise((resolve, reject) => {
-        videoElement.onloadedmetadata = resolve;
-        videoElement.onerror = reject;
-        videoElement.load();
-      });
-
-      // Try to capture the video stream
-      try {
-        if ('captureStream' in videoElement && typeof videoElement.captureStream === 'function') {
-          const stream = videoElement.captureStream();
-          return stream;
-        } else {
-          return null;
-        }
-      } catch (captureError) {
-
-        return null;
-      }
-
-    } catch (error) {
-
-      return null;
-    }
-  }
 
   // Log current WebRTC state for debugging
   private logWebRTCState(): void {
@@ -1501,52 +1523,6 @@ Your browser or device does not support camera access.
 
   }
 
-  // Log current connection state for debugging
-  private logConnectionState(): void {
-
-  }
-
-  // Ensure signal listener is set up for the current room
-  private async ensureSignalListenerSetup(): Promise<void> {
-    if (!this.currentRoomId) {
-      return;
-    }
-
-    try {
-              // First, ensure PubNub connection is established for this room
-        const userId = this.getAuthenticatedUserId();
-        if (userId) {
-          // TODO: Implement PubNub connect method
-          // await pubnubService.connect(userId, this.currentRoomId);
-
-          // Connection stabilization handled by PubNub service
-
-          // Check if we're properly subscribed to the channel
-          try {
-            // TODO: Implement getOnlineUsers method
-            // const onlineUsers = await pubnubService.getOnlineUsers();
-
-          } catch (error) {
-
-          }
-        } else {
-        }
-
-      // Then set up the signal listener
-      this.setupSignalListener();
-
-      // Test signal routing by sending a test signal
-      try {
-        await this.sendTestSignal('ice-candidate', { test: true });
-
-      } catch (error) {
-
-      }
-    } catch (error) {
-
-    }
-  }
-
   // Start checking for matches with optimized polling
   private startStatusChecking(): void {
     if (this.statusCheckInterval) {
@@ -1554,7 +1530,7 @@ Your browser or device does not support camera access.
     }
 
     // Reset polling state
-    this.pollingInterval = 2000; // Start with 2 seconds
+    this.pollingInterval = 1000; // Start with 1 second for faster response
     this.consecutiveEmptyResponses = 0;
     this.lastStatusResponse = null;
     this.isPollingPaused = false;
@@ -1587,7 +1563,7 @@ Your browser or device does not support camera access.
           this.isPollingPaused = false;
           this.pausePollingUntil = null;
           this.consecutiveEmptyResponses = 0;
-          this.pollingInterval = 2000;
+          this.pollingInterval = 1000;
         }
       }
 
@@ -1623,7 +1599,7 @@ Your browser or device does not support camera access.
 
       if (response.status === 'matched') {
         // Reset polling interval for next time
-        this.pollingInterval = 2000;
+        this.pollingInterval = 1000;
         this.consecutiveEmptyResponses = 0;
 
         this.currentRoomId = response.room_id;
@@ -1723,7 +1699,7 @@ Your browser or device does not support camera access.
       this.isPollingPaused = false;
       this.pausePollingUntil = null;
       this.consecutiveEmptyResponses = 0;
-      this.pollingInterval = 2000; // Reset to initial interval
+      this.pollingInterval = 1000; // Reset to initial interval
     }
   }
 
@@ -1835,30 +1811,30 @@ Your browser or device does not support camera access.
                               candidate.type === 'srflx' ||
                               candidate.protocol === 'tcp';
 
-        // Create unique identifier for candidate deduplication
-        const candidateId = `${candidate.candidate}_${candidate.sdpMLineIndex}_${candidate.sdpMid}`;
+        // Simplified candidate deduplication for performance
+        const candidateKey = candidate.candidate;
 
         // Skip if we've already sent this candidate
-        if (this.sentIceCandidates.has(candidateId)) {
+        if (this.sentIceCandidates.has(candidateKey)) {
           return;
         }
 
         if (isHighPriority) {
           // Send high-priority candidates immediately
-          this.sentIceCandidates.add(candidateId);
+          this.sentIceCandidates.add(candidateKey);
           this.sendSignal('ice-candidate', candidate);
         } else {
-          // Throttle low-priority candidates more aggressively
+          // OPTIMIZED: Send low-priority candidates immediately for fastest connection
           if (this.iceCandidateThrottleTimeout) {
             clearTimeout(this.iceCandidateThrottleTimeout);
           }
 
           this.iceCandidateThrottleTimeout = setTimeout(() => {
-            if (!this.sentIceCandidates.has(candidateId)) {
-              this.sentIceCandidates.add(candidateId);
+            if (!this.sentIceCandidates.has(candidateKey)) {
+              this.sentIceCandidates.add(candidateKey);
               this.sendSignal('ice-candidate', candidate);
             }
-          }, 200); // 200ms throttle for low-priority candidates
+          }, 0); // Immediate sending for fastest connection
         }
       }
     };
@@ -1980,22 +1956,20 @@ Your browser or device does not support camera access.
       return;
     }
 
-    // Create a unique identifier for this signal to prevent duplicates
-    const signalId = `${signal.type}_${signal.from}_${this.signalCounter++}_${Date.now()}`;
+    // Simplified signal deduplication using timestamp + type for performance
+    const signalKey = `${signal.type}_${signal.from}_${signal.ts || Date.now()}`;
 
-    // Check if we've already processed this signal
-    if (this.processedSignals.has(signalId)) {
-          return;
-        }
+    // Quick duplicate check with minimal processing
+    if (this.processedSignals.has(signalKey)) {
+      return;
+    }
 
-    // Mark this signal as processed
-    this.processedSignals.add(signalId);
+    // Mark as processed
+    this.processedSignals.add(signalKey);
 
-    // Clean up old signal IDs (keep only last 100)
-    if (this.processedSignals.size > 100) {
-      const signalArray = Array.from(this.processedSignals);
+    // Efficient cleanup - clear all if too many (avoid complex slicing)
+    if (this.processedSignals.size > 50) {
       this.processedSignals.clear();
-      signalArray.slice(-50).forEach(id => this.processedSignals.add(id));
     }
 
         // Enhanced signal integrity validation
@@ -2007,28 +1981,79 @@ Your browser or device does not support camera access.
     try {
       switch (signal.type) {
           case 'ready':
-          // We now use a simplified handshake where initiator starts immediately
-          // Ready signals are no longer needed for the handshake
-          break;
-        case 'offer':
-          if (signal.sdp) {
-            console.log('📨 Received OFFER, handling...');
-            // FIX: Ensure peer connection is in correct state for offer
-            if (this.peerConnection && this.peerConnection.signalingState === 'stable') {
-              await this.resetWebRTCState();
-              await this.setupPeerConnectionOnly();
-            }
-            await this.handleOffer({ sdp: signal.sdp, type: 'offer' });
-            console.log('✅ OFFER handled successfully');
-          } else {
-            console.log('❌ OFFER signal missing SDP');
+          // REACTIVE: Handle ready signal
+          console.log('✅ READY signal received from partner');
+          this.partnerReadyReceived = true;
+
+          // Clear resend timer (got the reply!)
+          if (this.readyResendTimer) {
+            clearTimeout(this.readyResendTimer);
+            this.readyResendTimer = null;
+          }
+
+          // RECEIVER: If we haven't sent ready yet, send it now (reply to initiator)
+          if (!this.isInitiator && !this.hasSentReadySignal && this.partnerId) {
+            console.log('✅ RECEIVER: Replying with ready signal...');
+            this.hasSentReadySignal = true;
+            pubnubService.sendReadySignal(this.partnerId, this.sessionVersion!);
+
+            // Start 2-second resend timer for receiver too
+            this.readyResendTimer = setTimeout(async () => {
+              if (!this.partnerReadyReceived) {
+                console.log('⚠️ RECEIVER: No confirmation in 2s, resending ready signal...');
+                await pubnubService.sendReadySignal(this.partnerId!, this.sessionVersion!);
+              }
+            }, 2000);
+          }
+
+          // Trigger callback IMMEDIATELY (no delay, no polling)
+          if (this.onPartnerReadyCallback) {
+            console.log('✅ Triggering ready callback!');
+            const callback = this.onPartnerReadyCallback;
+            this.onPartnerReadyCallback = null;
+            callback();
           }
           break;
+
+        case 'offer':
+          // REACTIVE: Handle offer signal
+          if (!signal.sdp) {
+            console.log('❌ OFFER signal missing SDP');
+            break;
+          }
+
+          console.log('✅ OFFER signal received from partner');
+
+          // Trigger callback IMMEDIATELY if waiting
+          if (this.onOfferReceivedCallback) {
+            console.log('✅ Triggering offer callback!');
+            const callback = this.onOfferReceivedCallback;
+            this.onOfferReceivedCallback = null;
+            callback({ sdp: signal.sdp, type: 'offer' });
+          } else {
+            // Process offer directly if not waiting for callback
+            await this.handleOffer({ sdp: signal.sdp, type: 'offer' });
+          }
+          break;
+
         case 'answer':
-          if (signal.sdp) {
-            console.log('📨 Received ANSWER, handling...');
+          // REACTIVE: Handle answer signal
+          if (!signal.sdp) {
+            console.log('❌ ANSWER signal missing SDP');
+            break;
+          }
+
+          console.log('✅ ANSWER signal received from partner');
+
+          // Trigger callback IMMEDIATELY if waiting
+          if (this.onAnswerReceivedCallback) {
+            console.log('✅ Triggering answer callback!');
+            const callback = this.onAnswerReceivedCallback;
+            this.onAnswerReceivedCallback = null;
+            callback({ sdp: signal.sdp, type: 'answer' });
+          } else {
+            // Process answer directly if not waiting for callback
             await this.handleAnswer({ sdp: signal.sdp, type: 'answer' });
-            console.log('✅ ANSWER handled successfully');
           }
           break;
         case 'ice':
@@ -2086,9 +2111,13 @@ Your browser or device does not support camera access.
     // Track PubNub connection state to prevent multiple joins
   private isPubNubConnecting = false;
 
-  // Track if ready signal has been sent to prevent duplicates
+  // REACTIVE STATE: Callbacks for signals (pure event-driven, no polling)
   private hasSentReadySignal = false;
   private partnerReadyReceived = false;
+  private onPartnerReadyCallback: (() => void) | null = null;
+  private onOfferReceivedCallback: ((offer: RTCSessionDescriptionInit) => void) | null = null;
+  private onAnswerReceivedCallback: ((answer: RTCSessionDescriptionInit) => void) | null = null;
+  private readyResendTimer: NodeJS.Timeout | null = null;
 
   // Track if WebRTC is being reset to prevent signal processing during reset
   private isWebRTCResetting = false;
@@ -2135,10 +2164,14 @@ Your browser or device does not support camera access.
         userId,
         {
           onMessage: (signal) => {
-            // Only log signal type, not every signal
-            if (signal.type !== 'ice') {
-              console.log('📨 PubNub signal received:', signal.type);
-            }
+            // DEBUG: Log ALL signals with full details
+            console.log('📨 PubNub RAW signal received:', {
+              type: signal.type,
+              from: signal.from,
+              to: signal.to,
+              myUserId: this.getAuthenticatedUserId(),
+              myPartnerId: this.partnerId
+            });
             this.handleIncomingSignal(signal);
           },
           onJoin: () => {
@@ -2160,187 +2193,140 @@ Your browser or device does not support camera access.
     }
   }
 
-  // Handle PubNub join and initiate handshake
+  // Handle PubNub join and initiate handshake - PURE REACTIVE (NO TIMEOUTS!)
   private async handlePubNubJoin(): Promise<void> {
-
     try {
-      // CRITICAL FIX: Simplified handshake - only initiator starts offer creation
-      if (this.partnerId && !this.hasSentReadySignal) {
+      if (!this.partnerId || this.hasSentReadySignal) {
+        return;
+      }
+
+      if (this.isInitiator) {
+        // INITIATOR: Send ready first, wait for receiver's reply
+        console.log('🚀 INITIATOR: Sending ready signal...');
         this.hasSentReadySignal = true;
+        await pubnubService.sendReadySignal(this.partnerId, this.sessionVersion!);
 
-        if (this.isInitiator) {
-          // INITIATOR: Create and send offer immediately (no ready signals needed)
-          console.log('🚀 INITIATOR: Creating offer immediately...');
+        // Start 2-second resend timer (safety net for race conditions)
+        this.readyResendTimer = setTimeout(async () => {
+          if (!this.partnerReadyReceived) {
+            console.log('⚠️ No ready reply in 2s, resending ready signal...');
+            await pubnubService.sendReadySignal(this.partnerId!, this.sessionVersion!);
+          }
+        }, 3000);
 
-          setTimeout(async () => {
-            try {
-              console.log('🎯 INITIATOR: Creating and sending offer...');
-              await this.createAndSendOffer();
-              console.log('✅ INITIATOR: Offer sent successfully');
-            } catch (error) {
-              console.log('❌ INITIATOR: Error creating offer:', error);
-            }
-          }, 300); // Allow PubNub channel to stabilize
-        } else {
-          // RECEIVER: Just wait for offer (no ready signal needed)
-          console.log('⏳ RECEIVER: PubNub connected, waiting for offer...');
-        }
+        console.log('⏳ INITIATOR: Waiting for receiver ready reply...');
+        await this.waitForPartnerReady(); // Waits for receiver's reply
+
+        console.log('✅ INITIATOR: Receiver ready, creating offer...');
+        await this.createAndSendOffer();
+      } else {
+        // RECEIVER: Wait for initiator's ready, then auto-reply (handled in signal handler)
+        console.log('✅ RECEIVER: Waiting for initiator ready signal...');
+        // When ready signal arrives, receiver will auto-reply and wait for offer
       }
     } catch (error) {
-      console.error('❌ Error in PubNub join handshake:', error);
+      console.error('❌ Error in handshake:', error);
     }
   }
 
-  // Handle WebRTC offer
+  // Wait for partner's ready signal - PURE REACTIVE
+  private async waitForPartnerReady(): Promise<void> {
+    // Already received? Resolve immediately
+    if (this.partnerReadyReceived) {
+      console.log('✅ Partner already ready (flag is true)');
+      return Promise.resolve();
+    }
+
+    console.log('⏳ Waiting for partner ready signal (setting up callback)...');
+
+    // Create promise that resolves when callback is triggered
+    return new Promise<void>((resolve) => {
+      this.onPartnerReadyCallback = resolve;
+    });
+  }
+
+  // Handle WebRTC offer - OPTIMIZED for speed
   private async handleOffer(offer: RTCSessionDescriptionInit): Promise<void> {
     console.log('📨 OFFER: Received offer, processing...');
 
     try {
-      // Ensure peer connection exists and is in stable state
+      // OPTIMIZED: Quick validation - only create if missing
       if (!this.peerConnection) {
         console.log('📨 OFFER: Creating new peer connection...');
         await this.setupPeerConnectionOnly();
-      } else {
-        // Double-check that the peer connection is truly fresh and ready
-        if (this.peerConnection.signalingState !== 'stable' ||
-            this.peerConnection.remoteDescription ||
-            this.peerConnection.localDescription) {
-          console.log('📨 OFFER: Resetting peer connection due to invalid state');
-          this.resetWebRTCState();
-
-          // Cleanup is synchronous, no delay needed
-
-          // Set up fresh peer connection
-          await this.setupPeerConnectionOnly();
-        }
       }
 
-      // Log current WebRTC state
-      this.logWebRTCState();
-
-      // Comprehensive state validation to prevent duplicate offer processing
-      if (this.peerConnection!.remoteDescription) {
-        console.log('📨 OFFER: Already have remote description, ignoring duplicate offer');
-        return;
+      if (!this.peerConnection) {
+        throw new Error('Peer connection not available');
       }
 
-      // Check if we're in a valid state for receiving an offer
-      if (this.peerConnection!.signalingState === 'have-remote-offer' ||
-          this.peerConnection!.signalingState === 'have-local-offer') {
-        console.log('📨 OFFER: Already processing offer/answer, ignoring duplicate');
-        return;
-      }
+      // OPTIMIZED: Skip duplicate checks - trust PubNub deduplication
+      // The signal deduplication in handleIncomingSignal already prevents duplicates
 
-      // FIXED: Accept offers in 'stable' state as long as no remote description exists
-      // 'stable' state is valid for receiving offers when the connection is fresh
-
-      // Set remote description first
+      // Set remote description immediately
       console.log('📨 OFFER: Setting remote description...');
-      await this.peerConnection!.setRemoteDescription(new RTCSessionDescription(offer));
-      this.logWebRTCState();
+      await this.peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
 
-      // Check remote stream status after setting remote description
-      this.checkRemoteStreamStatus();
-
-      // Log current signaling state for debugging
-      const currentState = this.peerConnection!.signalingState;
-      console.log('📨 OFFER: Signaling state after setting remote description:', currentState);
-
-      // Create and send answer
+      // Create and send answer immediately
       console.log('📨 OFFER: Creating answer...');
-      const answer = await this.peerConnection!.createAnswer();
-      await this.peerConnection!.setLocalDescription(answer);
-      this.logWebRTCState();
+      const answer = await this.peerConnection.createAnswer();
+      await this.peerConnection.setLocalDescription(answer);
 
-      // Check remote stream status again after setting local description
-      this.checkRemoteStreamStatus();
-
-      // Send answer to partner
+      // Send answer to partner immediately
       console.log('📨 OFFER: Sending answer to partner...');
       this.sendSignal('answer', answer);
 
-      // Process any queued ICE candidates
-      await this.processQueuedIceCandidates();
+      // Process queued ICE candidates in parallel (don't wait)
+      this.processQueuedIceCandidates();
 
       console.log('✅ OFFER: Offer processed successfully');
     } catch (error) {
       console.log('❌ OFFER: Error processing offer:', error);
 
-      // Reset state on critical errors
+      // Reset state only on critical errors
       if (error instanceof Error && (
         error.message.includes('setRemoteDescription') ||
         error.message.includes('setLocalDescription') ||
-        error.message.includes('createAnswer') ||
-        error.message.includes('Called in wrong state') ||
-        error.message.includes('Invalid signaling state')
+        error.message.includes('createAnswer')
       )) {
         this.resetWebRTCState();
       }
     }
   }
 
-  // Handle WebRTC answer
+  // Handle WebRTC answer - OPTIMIZED for speed
   private async handleAnswer(answer: RTCSessionDescriptionInit): Promise<void> {
     console.log('📨 ANSWER: Received answer, processing...');
 
     try {
-      // Ensure peer connection exists
-      if (!this.peerConnection) {
-        console.log('❌ ANSWER: No peer connection available');
+      // OPTIMIZED: Quick validation only
+      if (!this.peerConnection || !this.peerConnection.localDescription) {
+        console.log('❌ ANSWER: Invalid state - no peer connection or local description');
         return;
       }
 
-      // Ensure we have a local description before setting remote
-      if (!this.peerConnection.localDescription) {
-        console.log('❌ ANSWER: No local description available');
-        return;
-      }
-
-      // Log current WebRTC state
-      this.logWebRTCState();
-
-      // Check if peer connection is in the correct state for receiving an answer
-      if (this.peerConnection.signalingState !== 'have-local-offer') {
-        console.log('❌ ANSWER: Wrong signaling state:', this.peerConnection.signalingState);
-        // Reset the connection if it's in the wrong state
-        this.resetWebRTCState();
-        return;
-      }
-
-      // Set remote description
+      // Set remote description immediately
       console.log('📨 ANSWER: Setting remote description...');
       await this.peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
-      this.logWebRTCState();
 
-      // Log current signaling state
-      const currentState = this.peerConnection.signalingState;
-      console.log('📨 ANSWER: Signaling state after setting remote description:', currentState);
+      // Start heartbeat immediately (connection is now stable)
+      console.log('✅ ANSWER: Connection stable, starting heartbeat...');
+      this.startHeartbeat();
 
-      // Check if connection is stable (using string comparison to avoid TypeScript strictness)
-      if (String(currentState) === 'stable') {
-        console.log('✅ ANSWER: Connection is stable, starting heartbeat...');
-
-        // Start heartbeat monitoring for connection health
-        this.startHeartbeat();
-
-        // CRITICAL FIX: Update connection state to connected
-        if (this.onConnectionStateCallback) {
-          this.onConnectionStateCallback('connected' as RTCPeerConnectionState);
-        }
+      // Update connection state to connected
+      if (this.onConnectionStateCallback) {
+        this.onConnectionStateCallback('connected' as RTCPeerConnectionState);
       }
 
-      // Process queued ICE candidates
-      await this.processQueuedIceCandidates();
+      // Process queued ICE candidates in parallel (don't wait)
+      this.processQueuedIceCandidates();
 
       console.log('✅ ANSWER: Answer processed successfully');
     } catch (error) {
       console.log('❌ ANSWER: Error processing answer:', error);
 
-      // Reset state on critical errors
-      if (error instanceof Error && (
-        error.message.includes('setRemoteDescription') ||
-        error.message.includes('Called in wrong state')
-      )) {
+      // Reset state only on critical errors
+      if (error instanceof Error && error.message.includes('setRemoteDescription')) {
         this.resetWebRTCState();
       }
     }
@@ -2369,11 +2355,11 @@ Your browser or device does not support camera access.
       // Add to processing queue for batch processing
       this.iceProcessingQueue.push(candidate);
 
-      // Process queue with throttling
+      // OPTIMIZED: Process queue immediately for ultra-fast connection
       if (!this.iceProcessingTimeout) {
         this.iceProcessingTimeout = setTimeout(() => {
           this.processIceCandidateQueue();
-        }, 100); // Process every 100ms
+        }, 0); // Immediate processing for fastest connection
       }
     } catch (error) {
       // If we get an m-lines order error, this means the connection is in an invalid state
@@ -2415,9 +2401,10 @@ Your browser or device does not support camera access.
         }
       }
 
-      // Small delay between batches to prevent overwhelming
+      // OPTIMIZED: No delay between batches for fastest connection
+      // Modern browsers can handle this without overwhelming
       if (i + batchSize < candidates.length) {
-        await new Promise(resolve => setTimeout(resolve, 10));
+        await new Promise(resolve => setTimeout(resolve, 0));
       }
     }
   }
@@ -2507,6 +2494,19 @@ Your browser or device does not support camera access.
     this.messageBuffer.clear();
     this.processingMessages = false;
 
+    // Clear all reactive callbacks
+    this.onPartnerReadyCallback = null;
+    this.onOfferReceivedCallback = null;
+    this.onAnswerReceivedCallback = null;
+    this.partnerReadyReceived = false;
+    this.hasSentReadySignal = false;
+
+    // Clear resend timer
+    if (this.readyResendTimer) {
+      clearTimeout(this.readyResendTimer);
+      this.readyResendTimer = null;
+    }
+
         // Clear connection timeout
     this.stopConnectionTimeoutMonitoring();
 
@@ -2528,43 +2528,18 @@ Your browser or device does not support camera access.
     this.isWebRTCResetting = false;
   }
 
-  // Reset WebRTC state only (preserves local stream)
-  private resetWebRTCStateOnly(): void {
-
-    // Close peer connection
-    if (this.peerConnection) {
-        this.peerConnection.close();
-      this.peerConnection = null;
-    }
-
-    // Clear remote stream
-    if (this.remoteStream) {
-      this.remoteStream.getTracks().forEach(track => {
-        track.stop();
-      });
-      this.remoteStream = null;
-    }
-
-    // Clear WebRTC-related state
-    this.currentRoomId = null;
-    this.partnerId = null;
-    this.isInitiator = false;
-    this.sessionVersion = null;
-
-    // Clear ICE candidate queue
-    this.iceCandidateQueue = [];
-
-  }
-
-
-
-
   // Set up peer connection without creating offer (for non-initiators)
   private async setupPeerConnectionOnly(): Promise<void> {
-
     try {
-      // Use pre-warmed connection for faster setup
-      this.peerConnection = await this.getOptimizedPeerConnection();
+      // Use pre-warmed connection if available
+      if (this.preWarmedConnection && this.iceCandidatesReady) {
+        console.log('⚡ Using pre-warmed connection!');
+        this.peerConnection = this.preWarmedConnection;
+        this.preWarmedConnection = null; // Use it once
+      } else {
+        // Fallback to creating new connection
+        this.peerConnection = await this.getOptimizedPeerConnection();
+      }
 
       // Set up event handlers
       this.setupPeerConnectionHandlers();
@@ -2592,6 +2567,7 @@ Your browser or device does not support camera access.
       }
 
     } catch (error) {
+      console.error('❌ Peer connection setup failed:', error);
 
       // Reset state on critical errors
       if (error instanceof Error && error.message.includes('addTrack')) {
@@ -2674,38 +2650,31 @@ Your browser or device does not support camera access.
 
         // Verify we have a valid partner (not a ghost connection)
         if (matchData.partner.id === this.getAuthenticatedUserId()) {
-
           // Try to get a video match instead
           await this.requestVideoMatchFallback();
           return;
         }
 
         // CRITICAL: Verify all required data is set before proceeding
-
         if (!this.currentRoomId || !this.partnerId || !this.sessionVersion) {
           // Don't throw error, just log and continue for now
         } else {
         }
 
-        await this.setupPubNubConnection();
-
-        // Set up peer connection for both initiator and receiver
-        await this.setupPeerConnectionOnly();
-
-        // CRITICAL FIX: Update connection state to connecting for both users
+        // OPTIMIZED: Update connection state immediately
         if (this.onConnectionStateCallback) {
           this.onConnectionStateCallback('connecting' as RTCPeerConnectionState);
           console.log('🔄 LIVE MATCH: Connection state set to connecting');
         }
 
-        if (this.isInitiator) {
-          // For initiators, start the WebRTC connection (send offer)
-          console.log('🚀 LIVE MATCH: Initiator starting WebRTC connection...');
-          await this.startWebRTCConnection();
-        } else {
-          // For receivers, just wait for the offer
-          console.log('⏳ LIVE MATCH: Receiver waiting for offer...');
-        }
+        // OPTIMIZED: Ultra-fast parallel execution
+        await Promise.all([
+          this.setupPubNubConnection(),
+          this.setupPeerConnectionOnly()
+        ]);
+
+        // OPTIMIZED: Don't call startWebRTCConnection - PubNub join handler will handle it
+        // This eliminates duplicate work for initiators
       } else {
 
         // Fall back to video match
@@ -2769,19 +2738,6 @@ Your browser or device does not support camera access.
     }
   }
 
-  // Retry with exponential backoff
-  private async retryWithBackoff(operation: () => Promise<any>, maxRetries = 3): Promise<any> {
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
-      try {
-        return await operation();
-    } catch (error) {
-        if (attempt === maxRetries) throw error;
-
-        const delay = Math.pow(2, attempt) * 1000; // Exponential backoff
-        await new Promise(resolve => setTimeout(resolve, delay));
-      }
-    }
-  }
 
   // Attempt to reconnect after failure
   private async attemptReconnection(): Promise<void> {
@@ -2801,8 +2757,8 @@ Your browser or device does not support camera access.
       // Reset current state
     this.resetWebRTCState();
 
-      // Wait a bit before retrying (optimized for faster reconnection)
-      await new Promise(resolve => setTimeout(resolve, 500));
+      // OPTIMIZED: Minimal wait before retrying for faster reconnection
+      await new Promise(resolve => setTimeout(resolve, 100));
 
       // Try to set up connection again
       if (this.currentRoomId && this.partnerId && this.sessionVersion) {
@@ -2962,39 +2918,6 @@ Your browser or device does not support camera access.
 
   }
 
-  // Manually refresh token validation (useful for testing or when token is refreshed)
-  async refreshTokenValidation(): Promise<boolean> {
-
-    // Clear existing cache
-    this.tokenValidationCache = null;
-
-    // Force a new validation
-    try {
-      const userId = await this.waitForAuthentication(10000); // 10 second timeout for manual refresh
-      return !!userId;
-    } catch (error) {
-
-      return false;
-    }
-  }
-
-  // Check if camera permissions are available (legacy method for compatibility)
-  async checkCameraPermissions(): Promise<boolean> {
-    const permissionState = await this.checkPermissionState();
-    return permissionState === 'granted';
-  }
-
-  // Handle user matching and room setup
-  async handleUserMatched(roomId: string, partnerId: string, isInitiator: boolean): Promise<void> {
-
-    this.currentRoomId = roomId;
-    this.partnerId = partnerId;
-    this.isInitiator = isInitiator;
-
-    // Initialize WebRTC connection
-    await this.initializeWebRTC();
-  }
-
   // Check if user is in a chat room
   isInChat(): boolean {
     return this.currentRoomId !== null && this.partnerId !== null;
@@ -3022,7 +2945,7 @@ Your browser or device does not support camera access.
     // Clean up the current connection
     this.performSwipeCleanup();
 
-    // INSTANT re-matching: Don't wait, immediately try to find new match
+    // OPTIMIZED: Instant re-matching with zero delay
     setTimeout(async () => {
       try {
         console.log('🔄 Auto-requesting new match after partner left');
@@ -3030,7 +2953,7 @@ Your browser or device does not support camera access.
       } catch (error) {
         console.error('Failed to auto-request new match:', error);
       }
-    }, 50); // Minimal delay to ensure cleanup is complete
+    }, 0); // Immediate re-match request
   }
 
   // Check if currently swiping
@@ -3050,8 +2973,8 @@ Your browser or device does not support camera access.
       // CRITICAL FIX: Instead of just calling swipeToNext(), we need to rejoin the queue
       // This ensures the user gets a new VideoWaitingRoom entry and starts status checking
 
-      // Add minimal delay to prevent immediate re-matching with same partner who also failed
-      await new Promise(resolve => setTimeout(resolve, 50 + Math.random() * 100)); // 50-150ms random delay
+      // OPTIMIZED: Minimal delay for faster re-matching
+      await new Promise(resolve => setTimeout(resolve, 10)); // 10ms minimal delay
 
       try {
         // Stop current status checking first
@@ -3247,7 +3170,7 @@ Your browser or device does not support camera access.
       } else {
       }
 
-      // CRITICAL FIX: Also trigger the same rejoin logic as handlePartnerLeft
+      // OPTIMIZED: Trigger rejoin logic immediately for faster recovery
       setTimeout(async () => {
         try {
           await this.forceNewMatchRequest();
@@ -3255,7 +3178,7 @@ Your browser or device does not support camera access.
         } catch (error) {
 
         }
-      }, 100); // Minimal delay just to ensure UI updates are complete
+      }, 0); // Immediate re-match for fastest recovery
     } catch (error) {
 
     }
@@ -3297,35 +3220,40 @@ Your browser or device does not support camera access.
   }
 
 
-  // Create and send WebRTC offer (called by initiator after PubNub connection)
+  // Create and send WebRTC offer (called by initiator after PubNub connection) - OPTIMIZED
   private async createAndSendOffer(): Promise<void> {
-
-    // Prevent multiple offer creations
-    if (this.peerConnection?.localDescription) {
-      return;
-    }
+    console.log('🎯 createAndSendOffer: Starting offer creation...');
 
     try {
-      // OPTIMIZED: Use pre-warmed connection if available
-      if (!this.peerConnection) {
+      // OPTIMIZED: Simplified state check - only recreate if absolutely necessary
+      if (!this.peerConnection || this.peerConnection.signalingState === 'closed') {
         await this.setupPeerConnectionOnly();
-      } else {
-        // Check if the existing peer connection is in a valid state
-        const state = this.peerConnection.signalingState;
-
-        // Only reset if in an invalid state
-        if (state === 'closed' || state === 'have-remote-offer' || state === 'have-local-offer') {
-          this.resetWebRTCState();
-          await this.setupPeerConnectionOnly();
-        }
       }
 
-      // Double-check we have a clean peer connection
-      if (!this.peerConnection || this.peerConnection.signalingState !== 'stable') {
-        throw new Error('Peer connection not in stable state after setup');
+      // Quick validation - peer connection must exist
+      if (!this.peerConnection) {
+        throw new Error('Peer connection not available');
       }
 
       // OPTIMIZED: Create offer with optimized constraints for faster negotiation
+      // CRITICAL: Check if local stream is added before creating offer
+      if (!this.localStream) {
+        console.error('❌ createAndSendOffer: No local stream available!');
+        throw new Error('Local stream not available');
+      }
+
+      console.log('📹 createAndSendOffer: Local stream has', this.localStream.getTracks().length, 'tracks');
+
+      // CRITICAL: Check if tracks are actually in the peer connection
+      const senders = this.peerConnection.getSenders();
+      console.log('📡 createAndSendOffer: Peer connection has', senders.length, 'senders');
+      if (senders.length === 0) {
+        console.error('❌ createAndSendOffer: No senders in peer connection! Adding tracks...');
+        this.localStream.getTracks().forEach(track => {
+          this.peerConnection!.addTrack(track, this.localStream!);
+        });
+      }
+
       const offer = await this.peerConnection.createOffer({
         offerToReceiveAudio: true,
         offerToReceiveVideo: true,
@@ -3334,11 +3262,19 @@ Your browser or device does not support camera access.
 
       await this.peerConnection.setLocalDescription(offer);
 
+      console.log('✅ createAndSendOffer: Offer created, setting local description...');
+      console.log('📋 createAndSendOffer: SDP preview:', offer.sdp?.substring(0, 200));
+
       // Send offer to partner immediately
       if (this.partnerId) {
+        console.log(`📤 createAndSendOffer: Sending offer to partner ${this.partnerId}...`);
         await pubnubService.sendOffer(this.partnerId, offer.sdp || '');
+        console.log('✅ createAndSendOffer: Offer sent successfully');
+      } else {
+        console.error('❌ createAndSendOffer: No partner ID available');
       }
     } catch (error) {
+      console.error('❌ createAndSendOffer: Error:', error);
 
       // If we get an m-lines error, reset the state completely
       if (error instanceof Error && error.message.includes('m-lines')) {
@@ -3418,17 +3354,17 @@ Your browser or device does not support camera access.
         this.lastStreamStatus = currentStatus;
       }
 
-      // If we have a stable connection but no remote stream after 5 seconds, something is wrong
+      // OPTIMIZED: If we have a stable connection but no remote stream, check quickly
       if (connectionState === 'connected' && iceConnectionState === 'connected' && !this.remoteStream) {
-        console.log('⚠️ STREAM STATUS: Connection stable but no remote stream - possible issue');
+        console.log('⚠️ STREAM STATUS: Connection stable but no remote stream - checking quickly');
 
-        // Give it a bit more time, then check again
+        // OPTIMIZED: Quick check with shorter delay (1 second instead of 3)
         setTimeout(() => {
           if (!this.remoteStream && this.peerConnection?.connectionState === 'connected') {
-            console.log('❌ STREAM STATUS: Still no remote stream after delay - triggering fallback');
+            console.log('❌ STREAM STATUS: Still no remote stream - triggering fallback');
             this.handleConnectionFailure();
           }
-        }, 3000);
+        }, 1000); // Reduced from 3000ms to 1000ms
       }
     }
   }
